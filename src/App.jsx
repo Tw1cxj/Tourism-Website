@@ -1,8 +1,19 @@
 import { useState } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import AuthPages from "./AuthPages";
+import LandingPage from "./LandingPage";
 import SearchPage from "./SearchPage";
-import { createUser } from "./domain";
+import TransportPage from "./TransportPage";
+import RestaurantPage from "./RestaurantPage";
+import AdminDashboard from "./AdminDashboard";
+import { createUser, ROLES } from "./domain";
+
+// Only logged-in users with an allowed role can open the page
+function Guard({ user, allow, children }) {
+  if (!user) return <Navigate to="/login" replace />;
+  if (!allow.includes(user.role)) return <Navigate to={user.homePath()} replace />;
+  return children;
+}
 
 export default function App() {
   const navigate = useNavigate();
@@ -18,27 +29,33 @@ export default function App() {
   });
 
   const handleLogin = (data) => {
+    const u = createUser(data.user);
     sessionStorage.setItem("user", JSON.stringify(data.user));
-    setUser(createUser(data.user));
-    navigate("/home", { replace: true }); // after login -> Home page
+    setUser(u);
+    navigate(u.homePath(), { replace: true }); // admin -> /admin, others -> /home
   };
 
   const handleLogout = () => {
     sessionStorage.removeItem("user");
     setUser(null);
-    navigate("/login", { replace: true }); // after logout -> Auth page
+    navigate("/login", { replace: true });
   };
+
+  const people = [ROLES.USER, ROLES.VENDOR]; // roles that use the normal site
+  const home = () => navigate("/home");
 
   return (
     <Routes>
-      {/* Auth page first. If already logged in, skip straight to Home */}
-      <Route path="/login" element={user ? <Navigate to="/home" replace /> : <AuthPages onLoggedIn={handleLogin} />} />
+      <Route path="/login" element={user ? <Navigate to={user.homePath()} replace /> : <AuthPages onLoggedIn={handleLogin} />} />
 
-      {/* Home page is protected: not logged in -> redirected to /login */}
-      <Route path="/home" element={user ? <SearchPage user={user} onLogout={handleLogout} /> : <Navigate to="/login" replace />} />
+      <Route path="/home" element={<Guard user={user} allow={people}><LandingPage user={user} onLogout={handleLogout} /></Guard>} />
+      <Route path="/accommodation" element={<Guard user={user} allow={people}><SearchPage user={user} onLogout={handleLogout} onBack={home} /></Guard>} />
+      <Route path="/transportation" element={<Guard user={user} allow={people}><TransportPage user={user} onLogout={handleLogout} onBack={home} /></Guard>} />
+      <Route path="/restaurant" element={<Guard user={user} allow={people}><RestaurantPage user={user} onLogout={handleLogout} onBack={home} /></Guard>} />
 
-      {/* Any other address (including "/") goes to the right place */}
-      <Route path="*" element={<Navigate to={user ? "/home" : "/login"} replace />} />
+      <Route path="/admin" element={<Guard user={user} allow={[ROLES.ADMIN]}><AdminDashboard user={user} onLogout={handleLogout} /></Guard>} />
+
+      <Route path="*" element={<Navigate to={user ? user.homePath() : "/login"} replace />} />
     </Routes>
   );
 }
