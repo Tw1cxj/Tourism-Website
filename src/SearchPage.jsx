@@ -69,6 +69,7 @@ body{margin:0;font-family:"Segoe UI",system-ui,sans-serif;color:#14213d;backgrou
 .logout{border:1px solid rgba(255,255,255,.45);background:rgba(255,255,255,.12);color:#fff;padding:8px 18px;border-radius:99px;font:inherit;font-weight:600;cursor:pointer;backdrop-filter:blur(6px);transition:background .25s,transform .2s,color .25s}
 .logout:hover{background:#fff;color:#14213d;transform:translateY(-2px)}
 .logout:focus-visible{outline:3px solid #fff;outline-offset:2px}
+.navr{display:flex;align-items:center;gap:14px}
 @media(max-width:760px){.filters{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 `;
@@ -151,9 +152,9 @@ const SCENES = {
 function Illustration({ type }) {
   return SCENES[type] ?? SCENES.Hotel;
 }
-const DEFAULTS = { query: "", type: "", maxPrice: 300, guests: 1, sort: "recommended" };
+const DEFAULTS = { query: "", type: "", maxPrice: 600, guests: 1, sort: "recommended" };
 
-export default function SearchPage({ accommodations = sampleAccommodations, user, onLogout }) {
+export default function SearchPage({ accommodations = sampleAccommodations, user, onLogout, onBack }) {
   const [filters, setFilters] = useState(DEFAULTS);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState([]);
@@ -176,16 +177,19 @@ export default function SearchPage({ accommodations = sampleAccommodations, user
       <style>{css}</style>
       <header className="hero">
         <span className="orb o1" /><span className="orb o2" />
-        {onLogout && (
+        {(onLogout || onBack) && (
           <nav className="nav" aria-label="Account">
-            <span className="who">{user ? `${user.name} · ${user.role}` : ""}</span>
-            <button className="logout" onClick={onLogout}>Log out</button>
+            {onBack ? <button className="logout" onClick={onBack}>← Home</button> : <span />}
+            <div className="navr">
+              <span className="who">{user ? `${user.name} · ${user.role}` : ""}</span>
+              {onLogout && <button className="logout" onClick={onLogout}>Log out</button>}
+            </div>
           </nav>
         )}
         <div className="hero-in">
-          <p className="eyebrow">Stays worldwide</p>
+          <p className="eyebrow">Stays in Sarawak</p>
           <h1>Find a place to stay</h1>
-          <p className="lead">Search by city, country or property name.</p>
+          <p className="lead">Search Sarawak stays by town or property name.</p>
         </div>
       </header>
 
@@ -195,7 +199,7 @@ export default function SearchPage({ accommodations = sampleAccommodations, user
             <label htmlFor="query">Location or name</label>
             <div className="qwrap">
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
-              <input id="query" name="query" value={filters.query} onChange={set} placeholder="e.g. Lisbon" />
+              <input id="query" name="query" value={filters.query} onChange={set} placeholder="e.g. Kuching" />
             </div>
           </div>
           <div>
@@ -203,8 +207,8 @@ export default function SearchPage({ accommodations = sampleAccommodations, user
             <input id="guests" name="guests" type="number" min="1" max="10" value={filters.guests} onChange={set} />
           </div>
           <div>
-            <label htmlFor="maxPrice">Max price <span className="price-val">${filters.maxPrice}</span></label>
-            <input id="maxPrice" name="maxPrice" type="range" min="10" max="300" step="10" value={filters.maxPrice} onChange={set} />
+            <label htmlFor="maxPrice">Max price <span className="price-val">RM{filters.maxPrice}</span></label>
+            <input id="maxPrice" name="maxPrice" type="range" min="50" max="600" step="50" value={filters.maxPrice} onChange={set} />
           </div>
         </section>
 
@@ -234,7 +238,7 @@ export default function SearchPage({ accommodations = sampleAccommodations, user
           </div>
         ) : results.length === 0 ? (
           <div className="empty">
-            <p>No places match these filters. Try a different location or a higher price.</p>
+            <p>No places match these filters. Try a different town or a higher price.</p>
             <button onClick={() => setFilters(DEFAULTS)}>Clear filters</button>
           </div>
         ) : (
@@ -255,7 +259,7 @@ export default function SearchPage({ accommodations = sampleAccommodations, user
                   <p className="loc">{a.location.toString()}</p>
                   <div className="tags">{a.amenities.map((m) => <span key={m}>{m}</span>)}</div>
                   <div className="row">
-                    <span className="price"><strong>${a.pricePerNight}</strong> <span>/ night</span></span>
+                    <span className="price"><strong>RM{a.pricePerNight}</strong> <span>/ night</span></span>
                     <span className="meta"><b>★ {a.rating}</b>up to {a.maxGuests}</span>
                   </div>
                 </div>
