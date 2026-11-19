@@ -1,7 +1,10 @@
 import { useState } from "react";
+import { DEFAULT_ADMIN } from "./domain";
 
+// Set to false when your real backend API is ready
 const DEMO_MODE = true;
 
+/* ---------- Styles (plain CSS, no extra libraries) ---------- */
 const css = `
 *{box-sizing:border-box}
 body{margin:0;font-family:"Segoe UI",system-ui,sans-serif;color:#14213d}
@@ -29,6 +32,7 @@ input:focus,.roles button:focus-visible,.submit:focus-visible{outline:3px solid 
 .switch{margin-top:18px;text-align:center;color:#5b6784;font-size:.92rem}
 .link{border:0;background:none;color:#2a6df4;font:inherit;font-weight:600;cursor:pointer;padding:0}
 
+/* ---- Animations ---- */
 @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 @keyframes cardIn{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:none}}
 @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-7px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
@@ -55,7 +59,7 @@ input:focus{border-color:#2a6df4;box-shadow:0 0 0 4px rgba(42,109,244,.15);outli
 .link{transition:opacity .2s}.link:hover{opacity:.7}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 
-
+/* ---- Extra polish ---- */
 @keyframes flow{0%,100%{background-position:0 50%}50%{background-position:100% 50%}}
 @keyframes sheen{to{transform:translateX(100%)}}
 @keyframes draw{to{stroke-dashoffset:0}}
@@ -83,6 +87,7 @@ input:focus{border-color:#2a6df4;box-shadow:0 0 0 4px rgba(42,109,244,.15);outli
 .submit{position:relative;overflow:hidden;background:linear-gradient(90deg,#2a6df4,#1f8fe0)}
 .submit::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.4) 50%,transparent 70%);transform:translateX(-100%)}
 .submit:hover:not(:disabled)::after{animation:sheen .8s}
+.hint{margin:0 0 6px;padding:10px 12px;background:#eef3ff;border-radius:8px;color:#1e3a8a;font-size:.85rem;line-height:1.4;word-break:break-word}
 @media(max-width:800px){.auth{grid-template-columns:1fr}.auth-side{display:none}}
 `;
 
@@ -92,7 +97,7 @@ const ROLES = [
   { value: "admin", label: "Admin" },
 ];
 
-
+/* ---------- Role switcher ---------- */
 function RoleSwitch({ roles, value, onChange }) {
   const index = Math.max(0, roles.findIndex((r) => r.value === value));
   return (
@@ -126,7 +131,7 @@ function Field({ label, error, ...props }) {
   );
 }
 
-
+/* ---------- Login ---------- */
 export function LoginPage({ onSwitch, onLoggedIn }) {
   const [role, setRole] = useState("user");
   const [form, setForm] = useState({ email: "", password: "" });
@@ -151,18 +156,21 @@ export function LoginPage({ onSwitch, onLoggedIn }) {
       if (DEMO_MODE) {
         await new Promise((r) => setTimeout(r, 600));
         if (form.password === "wrong") throw new Error("Email, password or account type is incorrect.");
-        onLoggedIn?.({ user: { id: 1, name: form.email.split("@")[0], email: form.email, role } });
+        if (role === "admin" && (form.email.trim().toLowerCase() !== DEFAULT_ADMIN.email || form.password !== DEFAULT_ADMIN.password))
+          throw new Error("Invalid admin email or password.");
+        const name = role === "admin" ? "Administrator" : form.email.split("@")[0];
+        onLoggedIn?.({ user: { id: role === "admin" ? 1 : 100, name, email: form.email, role } });
         return;
       }
-      
+      // TODO: replace with your real API call
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...form, role }),
       });
       if (!res.ok) throw new Error("Email, password or account type is incorrect.");
-      const data = await res.json(); 
-      onLoggedIn?.(data);
+      const data = await res.json(); // e.g. { token, user: { role } }
+      onLoggedIn?.(data); // redirect by role: admin -> /admin, vendor -> /vendor, user -> /
     } catch (err) {
       setBanner(err.message);
       setTries((n) => n + 1);
@@ -176,6 +184,9 @@ export function LoginPage({ onSwitch, onLoggedIn }) {
       <h2>Log in</h2>
       <p className="sub">Choose your account type to continue.</p>
       <RoleSwitch roles={ROLES} value={role} onChange={setRole} />
+      {DEMO_MODE && role === "admin" && (
+        <p className="hint">Default admin login: <b>{DEFAULT_ADMIN.email}</b> / <b>{DEFAULT_ADMIN.password}</b></p>
+      )}
       {banner && <div className="banner" key={tries} role="alert">{banner}</div>}
       <Field label="Email" name="email" type="email" autoComplete="email" value={form.email} onChange={set} error={errors.email} />
       <Field label="Password" name="password" type="password" autoComplete="current-password" value={form.password} onChange={set} error={errors.password} />
@@ -187,7 +198,8 @@ export function LoginPage({ onSwitch, onLoggedIn }) {
   );
 }
 
-
+/* ---------- Register ---------- */
+// Admin accounts are not self-registered; create them from the backend or an admin panel.
 export function RegisterPage({ onSwitch }) {
   const [role, setRole] = useState("user");
   const [form, setForm] = useState({ name: "", email: "", password: "", confirm: "", businessName: "" });
@@ -217,7 +229,7 @@ export function RegisterPage({ onSwitch }) {
         setBanner({ ok: true, text: "Account created. You can log in now." });
         return;
       }
-      
+      // TODO: replace with your real API call
       const { confirm, ...payload } = form;
       const res = await fetch("/api/auth/register", {
         method: "POST",
@@ -257,6 +269,7 @@ export function RegisterPage({ onSwitch }) {
   );
 }
 
+/* ---------- Page shell: toggles between the two pages ---------- */
 export default function AuthPages({ onLoggedIn }) {
   const [page, setPage] = useState("login");
   return (
@@ -268,7 +281,7 @@ export default function AuthPages({ onLoggedIn }) {
           <span className="blob b" />
           <div className="brand">
             <span className="logo"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7M5 10v10h14V10M10 20v-6h4v6" /></svg></span>
-            Tourism
+            StayFinder
           </div>
           <div>
             <h1>One account, the right access.</h1>
