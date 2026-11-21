@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { TransportCatalog, TRANSPORT_TYPES, sampleTransport } from "./domain";
-import { serviceCss, Hero, Skeleton, Empty, HeartButton, Thumb } from "./serviceShared";
+import { serviceCss, Hero, Skeleton, Empty, HeartButton, Thumb } from "./ServiceShared";
 
 const LOOK = {
   "Express bus": { emoji: "🚌", from: "#1d4ed8", to: "#38bdf8" },
@@ -8,7 +8,7 @@ const LOOK = {
 };
 const DEFAULTS = { query: "", type: "", maxPrice: 100, seats: 1, sort: "recommended" };
 
-export default function TransportPage({ items = sampleTransport, user, onLogout, onBack }) {
+export default function TransportPage({ items = sampleTransport, user, onLogout, onBack, onBook }) {
   const [filters, setFilters] = useState(DEFAULTS);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState([]);
@@ -85,6 +85,7 @@ export default function TransportPage({ items = sampleTransport, user, onLogout,
                       <span className="price"><strong>RM{t.price}</strong> <span>/ {t.priceUnit}</span></span>
                       <span className="meta"><b>★ {t.rating}</b>up to {t.capacity}</span>
                     </div>
+                  <button className="book" onClick={() => onBook?.(t)}>Book now</button>
                   </div>
                 </article>
               );
