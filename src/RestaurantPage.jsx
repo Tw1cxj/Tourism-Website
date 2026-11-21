@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { RestaurantCatalog, RESTAURANT_CUISINES, sampleRestaurants } from "./domain";
-import { serviceCss, Hero, Skeleton, Empty, HeartButton, Thumb } from "./serviceShared";
+import { serviceCss, Hero, Skeleton, Empty, HeartButton, Thumb } from "./ServiceShared";
 
 const LOOK = {
   "Sarawak local": { emoji: "🍜", from: "#c2410c", to: "#fb923c" },
@@ -12,7 +12,7 @@ const LOOK = {
 };
 const DEFAULTS = { query: "", cuisine: "", maxLevel: 3, dietary: "", sort: "recommended" };
 
-export default function RestaurantPage({ items = sampleRestaurants, user, onLogout, onBack }) {
+export default function RestaurantPage({ items = sampleRestaurants, user, onLogout, onBack, onBook }) {
   const [filters, setFilters] = useState(DEFAULTS);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState([]);
@@ -96,6 +96,7 @@ export default function RestaurantPage({ items = sampleRestaurants, user, onLogo
                       <span className="price"><strong>{r.priceLabel}</strong></span>
                       <span className="meta"><b>★ {r.rating}</b>rated</span>
                     </div>
+                  <button className="book" onClick={() => onBook?.(r)}>Reserve a table</button>
                   </div>
                 </article>
               );
