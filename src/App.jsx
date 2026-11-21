@@ -6,6 +6,7 @@ import SearchPage from "./SearchPage";
 import TransportPage from "./TransportPage";
 import RestaurantPage from "./RestaurantPage";
 import AdminDashboard from "./AdminDashboard";
+import VendorDashboard from "./VendorDashboard";
 import { createUser, ROLES } from "./domain";
 
 // Only logged-in users with an allowed role can open the page
@@ -32,7 +33,7 @@ export default function App() {
     const u = createUser(data.user);
     sessionStorage.setItem("user", JSON.stringify(data.user));
     setUser(u);
-    navigate(u.homePath(), { replace: true }); // admin -> /admin, others -> /home
+    navigate(u.homePath(), { replace: true }); // admin -> /admin, vendor -> /vendor, others -> /home
   };
 
   const handleLogout = () => {
@@ -53,6 +54,7 @@ export default function App() {
       <Route path="/transportation" element={<Guard user={user} allow={people}><TransportPage user={user} onLogout={handleLogout} onBack={home} /></Guard>} />
       <Route path="/restaurant" element={<Guard user={user} allow={people}><RestaurantPage user={user} onLogout={handleLogout} onBack={home} /></Guard>} />
 
+      <Route path="/vendor" element={<Guard user={user} allow={[ROLES.VENDOR]}><VendorDashboard user={user} onLogout={handleLogout} /></Guard>} />
       <Route path="/admin" element={<Guard user={user} allow={[ROLES.ADMIN]}><AdminDashboard user={user} onLogout={handleLogout} /></Guard>} />
 
       <Route path="*" element={<Navigate to={user ? user.homePath() : "/login"} replace />} />

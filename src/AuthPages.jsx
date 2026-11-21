@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { DEFAULT_ADMIN } from "./domain";
+import { DEFAULT_ADMIN, DEFAULT_VENDOR } from "./domain";
 
 // Set to false when your real backend API is ready
 const DEMO_MODE = true;
@@ -158,8 +158,10 @@ export function LoginPage({ onSwitch, onLoggedIn }) {
         if (form.password === "wrong") throw new Error("Email, password or account type is incorrect.");
         if (role === "admin" && (form.email.trim().toLowerCase() !== DEFAULT_ADMIN.email || form.password !== DEFAULT_ADMIN.password))
           throw new Error("Invalid admin email or password.");
+        if (role === "vendor" && (form.email.trim().toLowerCase() !== DEFAULT_VENDOR.email || form.password !== DEFAULT_VENDOR.password))
+          throw new Error("Invalid vendor email or password.");
         const name = role === "admin" ? "Administrator" : form.email.split("@")[0];
-        onLoggedIn?.({ user: { id: role === "admin" ? 1 : 100, name, email: form.email, role } });
+        onLoggedIn?.({ user: { id: role === "admin" ? 1 : role === "vendor" ? DEFAULT_VENDOR.id : 200, name, email: form.email.trim(), role } });
         return;
       }
       // TODO: replace with your real API call
@@ -184,6 +186,9 @@ export function LoginPage({ onSwitch, onLoggedIn }) {
       <h2>Log in</h2>
       <p className="sub">Choose your account type to continue.</p>
       <RoleSwitch roles={ROLES} value={role} onChange={setRole} />
+      {DEMO_MODE && role === "vendor" && (
+        <p className="hint">Demo vendor login: <b>{DEFAULT_VENDOR.email}</b> / <b>{DEFAULT_VENDOR.password}</b></p>
+      )}
       {DEMO_MODE && role === "admin" && (
         <p className="hint">Default admin login: <b>{DEFAULT_ADMIN.email}</b> / <b>{DEFAULT_ADMIN.password}</b></p>
       )}
