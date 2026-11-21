@@ -67,17 +67,21 @@ body{margin:0;font-family:"Segoe UI",system-ui,sans-serif;color:#14213d;backgrou
 .s-img{height:150px}.s-line{height:14px;border-radius:7px;margin:16px 18px 0}.w60{width:60%}.w40{width:40%;margin-bottom:20px}
 .empty{text-align:center;padding:56px 16px;background:#fff;border-radius:16px;color:#5b6784;animation:rise .4s ease}
 .empty button{margin-top:12px;border:0;background:var(--accent);color:#fff;padding:10px 18px;border-radius:10px;font:inherit;font-weight:600;cursor:pointer}
+.book{width:100%;margin-top:14px;border:0;border-radius:10px;padding:11px;background:var(--accent,#2a6df4);color:#fff;font:inherit;font-weight:600;cursor:pointer;transition:transform .2s,box-shadow .2s,filter .2s}
+.book:hover{transform:translateY(-2px);box-shadow:0 8px 18px rgba(20,33,61,.25);filter:brightness(1.08)}
+.book:active{transform:translateY(0)}
+.book:focus-visible{outline:3px solid var(--accent,#2a6df4);outline-offset:2px}
 @media(max-width:760px){.filters{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 `;
 
-export function Hero({ eyebrow, title, lead, user, onBack, onLogout }) {
+export function Hero({ eyebrow, title, lead, user, onBack, onLogout, backLabel = "← Home" }) {
   return (
     <header className="hero">
       <span className="orb o1" /><span className="orb o2" />
       {(onBack || onLogout) && (
         <nav className="nav" aria-label="Account">
-          {onBack ? <button className="logout" onClick={onBack}>← Home</button> : <span />}
+          {onBack ? <button className="logout" onClick={onBack}>{backLabel}</button> : <span />}
           <div className="navr">
             <span className="who">{user ? `${user.name} · ${user.role}` : ""}</span>
             {onLogout && <button className="logout" onClick={onLogout}>Log out</button>}
