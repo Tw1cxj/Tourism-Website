@@ -70,6 +70,10 @@ body{margin:0;font-family:"Segoe UI",system-ui,sans-serif;color:#14213d;backgrou
 .logout:hover{background:#fff;color:#14213d;transform:translateY(-2px)}
 .logout:focus-visible{outline:3px solid #fff;outline-offset:2px}
 .navr{display:flex;align-items:center;gap:14px}
+.book{width:100%;margin-top:14px;border:0;border-radius:10px;padding:11px;background:var(--accent,#2a6df4);color:#fff;font:inherit;font-weight:600;cursor:pointer;transition:transform .2s,box-shadow .2s,filter .2s}
+.book:hover{transform:translateY(-2px);box-shadow:0 8px 18px rgba(20,33,61,.25);filter:brightness(1.08)}
+.book:active{transform:translateY(0)}
+.book:focus-visible{outline:3px solid var(--accent,#2a6df4);outline-offset:2px}
 @media(max-width:760px){.filters{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 `;
@@ -154,7 +158,7 @@ function Illustration({ type }) {
 }
 const DEFAULTS = { query: "", type: "", maxPrice: 600, guests: 1, sort: "recommended" };
 
-export default function SearchPage({ accommodations = sampleAccommodations, user, onLogout, onBack }) {
+export default function SearchPage({ accommodations = sampleAccommodations, user, onLogout, onBack, onBook }) {
   const [filters, setFilters] = useState(DEFAULTS);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState([]);
@@ -262,6 +266,7 @@ export default function SearchPage({ accommodations = sampleAccommodations, user
                     <span className="price"><strong>RM{a.pricePerNight}</strong> <span>/ night</span></span>
                     <span className="meta"><b>★ {a.rating}</b>up to {a.maxGuests}</span>
                   </div>
+                  <button className="book" onClick={() => onBook?.(a)}>Book now</button>
                 </div>
               </article>
             ))}
