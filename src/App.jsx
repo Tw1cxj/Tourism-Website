@@ -5,8 +5,8 @@ import LandingPage from "./LandingPage";
 import SearchPage from "./SearchPage";
 import TransportPage from "./TransportPage";
 import RestaurantPage from "./RestaurantPage";
+import BookingPage from "./BookingPage";
 import AdminDashboard from "./AdminDashboard";
-import VendorDashboard from "./VendorDashboard";
 import { createUser, ROLES } from "./domain";
 
 // Only logged-in users with an allowed role can open the page
@@ -14,6 +14,14 @@ function Guard({ user, allow, children }) {
   if (!user) return <Navigate to="/login" replace />;
   if (!allow.includes(user.role)) return <Navigate to={user.homePath()} replace />;
   return children;
+}
+
+// What the booking page needs to know about the chosen item
+function toDraft(kind, item) {
+  const place = String(item.location);
+  if (kind === "accommodation") return { name: item.name, place, unitPrice: item.pricePerNight, unit: "night", max: item.maxGuests };
+  if (kind === "transport") return { name: item.name, place, unitPrice: item.price, unit: item.priceUnit, max: item.capacity };
+  return { name: item.name, place, priceLabel: item.priceLabel, max: 12 };
 }
 
 export default function App() {
@@ -33,7 +41,7 @@ export default function App() {
     const u = createUser(data.user);
     sessionStorage.setItem("user", JSON.stringify(data.user));
     setUser(u);
-    navigate(u.homePath(), { replace: true }); // admin -> /admin, vendor -> /vendor, others -> /home
+    navigate(u.homePath(), { replace: true }); // admin -> /admin, others -> /home
   };
 
   const handleLogout = () => {
@@ -44,17 +52,20 @@ export default function App() {
 
   const people = [ROLES.USER, ROLES.VENDOR]; // roles that use the normal site
   const home = () => navigate("/home");
+  // Book button -> opens the booking page for that item
+  const book = (kind) => (item) => navigate("/booking", { state: { kind, draft: toDraft(kind, item) } });
 
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to={user.homePath()} replace /> : <AuthPages onLoggedIn={handleLogin} />} />
 
       <Route path="/home" element={<Guard user={user} allow={people}><LandingPage user={user} onLogout={handleLogout} /></Guard>} />
-      <Route path="/accommodation" element={<Guard user={user} allow={people}><SearchPage user={user} onLogout={handleLogout} onBack={home} /></Guard>} />
-      <Route path="/transportation" element={<Guard user={user} allow={people}><TransportPage user={user} onLogout={handleLogout} onBack={home} /></Guard>} />
-      <Route path="/restaurant" element={<Guard user={user} allow={people}><RestaurantPage user={user} onLogout={handleLogout} onBack={home} /></Guard>} />
+      <Route path="/accommodation" element={<Guard user={user} allow={people}><SearchPage user={user} onLogout={handleLogout} onBack={home} onBook={book("accommodation")} /></Guard>} />
+      <Route path="/transportation" element={<Guard user={user} allow={people}><TransportPage user={user} onLogout={handleLogout} onBack={home} onBook={book("transport")} /></Guard>} />
+      <Route path="/restaurant" element={<Guard user={user} allow={people}><RestaurantPage user={user} onLogout={handleLogout} onBack={home} onBook={book("restaurant")} /></Guard>} />
 
-      <Route path="/vendor" element={<Guard user={user} allow={[ROLES.VENDOR]}><VendorDashboard user={user} onLogout={handleLogout} /></Guard>} />
+      <Route path="/booking" element={<Guard user={user} allow={people}><BookingPage user={user} onLogout={handleLogout} /></Guard>} />
+
       <Route path="/admin" element={<Guard user={user} allow={[ROLES.ADMIN]}><AdminDashboard user={user} onLogout={handleLogout} /></Guard>} />
 
       <Route path="*" element={<Navigate to={user ? user.homePath() : "/login"} replace />} />
