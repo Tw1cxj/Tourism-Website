@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { serviceCss, Hero } from "./ServiceShared";
+import { EventRow, eventCss } from "./EventRow";
+import { eventsForStay, eventsInArea, cityOf } from "./Events";
+import { todayISO, addDays, nightsBetween, formatDate } from "./Bookings";
 
 const KIND = {
   accommodation: { label: "Accommodation", accent: "#2a6df4", g1: "#1d3a8a", g2: "#2a6df4", back: "/accommodation", cta: "Confirm booking", icon: "🏨" },
@@ -41,18 +44,14 @@ const css = `
 .acts button{border:0;border-radius:10px;padding:11px 20px;font:inherit;font-weight:600;cursor:pointer;background:var(--accent);color:#fff;transition:transform .2s}
 .acts button.alt{background:#e4e9f4;color:#14213d}
 .acts button:hover{transform:translateY(-2px)}
-@media(max-width:820px){.bk{grid-template-columns:1fr}.sum{position:static}}
+.evp{grid-column:1}
+.sum{grid-row:1 / span 2;grid-column:2}
+.evnone{color:#5b6784;margin:0 0 12px;font-size:.9rem}
+@media(max-width:820px){.bk{grid-template-columns:1fr}.sum{position:static;grid-row:auto;grid-column:auto}.evp{grid-column:auto}}
 `;
 
-// Small date helpers (kept in this file so the page has no other dependencies)
-const iso = (d) => d.toLocaleDateString("en-CA"); // YYYY-MM-DD
-const todayISO = () => iso(new Date());
-const addDays = (s, n) => { const d = new Date(s + "T00:00:00"); d.setDate(d.getDate() + n); return iso(d); };
-const nightsBetween = (a, b) => Math.round((new Date(b + "T00:00:00") - new Date(a + "T00:00:00")) / 86400000);
-const fmt = (s) => new Date(s + "T00:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
-
 // Opened from a card's Book button. The chosen item arrives in the router state.
-export default function BookingPage({ user, onLogout }) {
+export default function BookingPage({ user, onLogout, onConfirm, savedEvents = [], onToggleEvent }) {
   const { state } = useLocation();
   const navigate = useNavigate();
   const info = KIND[state?.kind];
@@ -60,7 +59,6 @@ export default function BookingPage({ user, onLogout }) {
   const kind = state?.kind;
   const today = todayISO();
   const [form, setForm] = useState({ date: addDays(today, 1), endDate: addDays(today, 2), time: kind === "restaurant" ? "19:00" : "09:00", people: 1 });
-  const [done, setDone] = useState(false);
 
   if (!info || !item) {
     return (
@@ -85,35 +83,35 @@ export default function BookingPage({ user, onLogout }) {
   if (kind !== "accommodation" && !form.time) errors.time = "Choose a time.";
   const valid = Object.keys(errors).length === 0;
 
-  const submit = (e) => { e.preventDefault(); if (valid) setDone(true); };
+  // Concerts and festivals around the stay
+  const city = cityOf(item.place);
+  const stayEvents = kind === "accommodation" && !errors.date && !errors.endDate ? eventsForStay(city, form.date, form.endDate) : [];
+  const fallbackEvents = kind === "accommodation" && stayEvents.length === 0 ? eventsInArea(city, 30).slice(0, 3) : [];
+  const eventRow = (e, i, note) => (
+    <EventRow key={e.id} event={e} note={note} delay={i * 60} saved={savedEvents.includes(e.id)} onToggle={onToggleEvent} />
+  );
+
+  const submit = (e) => {
+    e.preventDefault();
+    if (!valid) return;
+    // Save the booking, then show the itinerary
+    const booking = onConfirm({
+      kind, itemId: item.id, itemName: item.name, place: item.place,
+      date: form.date, endDate: kind === "accommodation" ? form.endDate : "",
+      time: kind === "accommodation" ? "" : form.time, people: form.people, total,
+    });
+    navigate("/itinerary", { state: { justBooked: booking.id } });
+  };
   const money = kind === "restaurant" ? "Pay at the restaurant" : `RM${total}`;
   const peopleLabel = kind === "accommodation" ? "Guests" : kind === "transport" ? "Passengers" : "Party size";
 
   return (
     <div style={{ "--g1": info.g1, "--g2": info.g2, "--accent": info.accent }}>
-      <style>{serviceCss + css}</style>
-      <Hero eyebrow={info.label} title={done ? "All set!" : `Book ${item.name}`} lead={item.place}
+      <style>{serviceCss + css + eventCss}</style>
+      <Hero eyebrow={info.label} title={`Book ${item.name}`} lead={item.place}
         user={user} onBack={() => navigate(info.back)} backLabel="← Back" onLogout={onLogout} />
       <main className="wrap">
-        {done ? (
-          <div className="done">
-            <div className="ring"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" /></svg></div>
-            <h2>{kind === "restaurant" ? "Table reserved" : "Booking confirmed"}</h2>
-            <p>This is a demo. Nothing is saved yet.</p>
-            <div className="facts">
-              <div><span>{info.label}</span><b>{item.name}</b></div>
-              <div><span>{kind === "accommodation" ? "Check-in" : "Date"}</span><b>{fmt(form.date)}</b></div>
-              {kind === "accommodation" && <div><span>Check-out</span><b>{fmt(form.endDate)}</b></div>}
-              {kind !== "accommodation" && <div><span>Time</span><b>{form.time}</b></div>}
-              <div><span>{peopleLabel}</span><b>{form.people}</b></div>
-              <div><span>Total</span><b>{money}</b></div>
-            </div>
-            <div className="acts">
-              <button onClick={() => navigate("/home")}>Back to home</button>
-              <button className="alt" onClick={() => navigate(info.back)}>Book something else</button>
-            </div>
-          </div>
-        ) : (
+        
           <form className="bk" onSubmit={submit} noValidate>
             <section className="panel">
               <h2>Your details</h2>
@@ -149,6 +147,20 @@ export default function BookingPage({ user, onLogout }) {
               {errors.people && <p className="fe">{errors.people}</p>}
             </section>
 
+            {kind === "accommodation" && (
+              <section className="panel evp" aria-label="Events near your stay">
+                <h2>🎶 Events near your stay</h2>
+                {stayEvents.length > 0 ? (
+                  stayEvents.map((e, i) => eventRow(e, i, e.when))
+                ) : (
+                  <>
+                    <p className="evnone">Nothing on in {city} during these dates. Coming up in the area:</p>
+                    {fallbackEvents.length > 0 ? fallbackEvents.map((e, i) => eventRow(e, i)) : <p className="evnone">No events listed nearby right now.</p>}
+                  </>
+                )}
+              </section>
+            )}
+
             <aside className="panel sum" aria-label="Booking summary">
               <div className="item">
                 <span className="em" aria-hidden="true">{info.icon}</span>
@@ -157,13 +169,12 @@ export default function BookingPage({ user, onLogout }) {
               {kind === "accommodation" && <div className="line"><span>RM{item.unitPrice} × {Math.max(nights, 0)} night(s)</span><span>RM{total}</span></div>}
               {kind === "transport" && <div className="line"><span>RM{item.unitPrice} {item.unit === "ticket" ? `× ${form.people} ticket(s)` : "per trip"}</span><span>RM{total}</span></div>}
               {kind === "restaurant" && item.priceLabel && <div className="line"><span>Price range</span><span>{item.priceLabel}</span></div>}
-              <div className="line"><span>{fmt(form.date)}</span><span>{kind === "accommodation" ? (errors.endDate ? "—" : `→ ${fmt(form.endDate)}`) : form.time}</span></div>
+              <div className="line"><span>{formatDate(form.date)}</span><span>{kind === "accommodation" ? (errors.endDate ? "—" : `→ ${formatDate(form.endDate)}`) : form.time}</span></div>
               <div className="total"><span>Total</span><b key={money}>{money}</b></div>
               <button className="confirm" disabled={!valid}>{info.cta}</button>
               <p className="note">Demo only. No payment is taken.</p>
             </aside>
           </form>
-        )}
       </main>
     </div>
   );

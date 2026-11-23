@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { NearbyBadge } from "./EventRow";
+import { eventsInArea } from "./Events";
 import { AccommodationCatalog, ACCOMMODATION_TYPES, sampleAccommodations } from "./domain";
 
 const css = `
@@ -261,6 +263,7 @@ export default function SearchPage({ accommodations = sampleAccommodations, user
                 <div className="body">
                   <h3>{a.name}</h3>
                   <p className="loc">{a.location.toString()}</p>
+                  <NearbyBadge events={eventsInArea(a.location.city)} />
                   <div className="tags">{a.amenities.map((m) => <span key={m}>{m}</span>)}</div>
                   <div className="row">
                     <span className="price"><strong>RM{a.pricePerNight}</strong> <span>/ night</span></span>

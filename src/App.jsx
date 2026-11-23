@@ -6,6 +6,8 @@ import SearchPage from "./SearchPage";
 import TransportPage from "./TransportPage";
 import RestaurantPage from "./RestaurantPage";
 import BookingPage from "./BookingPage";
+import ItineraryPage from "./ItineraryPage";
+import { useBookings } from "./Bookings";
 import AdminDashboard from "./AdminDashboard";
 import { createUser, ROLES } from "./domain";
 
@@ -19,9 +21,9 @@ function Guard({ user, allow, children }) {
 // What the booking page needs to know about the chosen item
 function toDraft(kind, item) {
   const place = String(item.location);
-  if (kind === "accommodation") return { name: item.name, place, unitPrice: item.pricePerNight, unit: "night", max: item.maxGuests };
-  if (kind === "transport") return { name: item.name, place, unitPrice: item.price, unit: item.priceUnit, max: item.capacity };
-  return { name: item.name, place, priceLabel: item.priceLabel, max: 12 };
+  if (kind === "accommodation") return { itemId: item.id, name: item.name, place, unitPrice: item.pricePerNight, unit: "night", max: item.maxGuests };
+  if (kind === "transport") return { itemId: item.id, name: item.name, place, unitPrice: item.price, unit: item.priceUnit, max: item.capacity };
+  return { itemId: item.id, name: item.name, place, priceLabel: item.priceLabel, max: 12 };
 }
 
 export default function App() {
@@ -36,6 +38,8 @@ export default function App() {
       return null;
     }
   });
+
+  const { bookings, addBooking, cancelBooking, savedEvents, toggleEvent } = useBookings(user);
 
   const handleLogin = (data) => {
     const u = createUser(data.user);
@@ -59,12 +63,14 @@ export default function App() {
     <Routes>
       <Route path="/login" element={user ? <Navigate to={user.homePath()} replace /> : <AuthPages onLoggedIn={handleLogin} />} />
 
-      <Route path="/home" element={<Guard user={user} allow={people}><LandingPage user={user} onLogout={handleLogout} /></Guard>} />
+      <Route path="/home" element={<Guard user={user} allow={people}><LandingPage user={user} onLogout={handleLogout} bookings={bookings} onItinerary={() => navigate("/itinerary")} savedEvents={savedEvents} onToggleEvent={toggleEvent} /></Guard>} />
       <Route path="/accommodation" element={<Guard user={user} allow={people}><SearchPage user={user} onLogout={handleLogout} onBack={home} onBook={book("accommodation")} /></Guard>} />
       <Route path="/transportation" element={<Guard user={user} allow={people}><TransportPage user={user} onLogout={handleLogout} onBack={home} onBook={book("transport")} /></Guard>} />
       <Route path="/restaurant" element={<Guard user={user} allow={people}><RestaurantPage user={user} onLogout={handleLogout} onBack={home} onBook={book("restaurant")} /></Guard>} />
 
-      <Route path="/booking" element={<Guard user={user} allow={people}><BookingPage user={user} onLogout={handleLogout} /></Guard>} />
+      <Route path="/booking" element={<Guard user={user} allow={people}><BookingPage user={user} onLogout={handleLogout} onConfirm={addBooking} savedEvents={savedEvents} onToggleEvent={toggleEvent} /></Guard>} />
+
+      <Route path="/itinerary" element={<Guard user={user} allow={people}><ItineraryPage user={user} bookings={bookings} onCancel={cancelBooking} onBack={home} onBrowse={home} onLogout={handleLogout} savedEvents={savedEvents} onToggleEvent={toggleEvent} /></Guard>} />
 
       <Route path="/admin" element={<Guard user={user} allow={[ROLES.ADMIN]}><AdminDashboard user={user} onLogout={handleLogout} /></Guard>} />
 

@@ -1,4 +1,7 @@
 import { Link } from "react-router-dom";
+import { formatDate, relativeDay } from "./Bookings";
+import { EventRow, eventCss } from "./EventRow";
+import { upcomingItinerary, nextEvents } from "./Events";
 
 const css = `
 *{box-sizing:border-box}
@@ -37,8 +40,36 @@ body{margin:0;font-family:"Segoe UI",system-ui,sans-serif}
 .svc p{margin:0 0 22px;color:#5b6784;line-height:1.45}
 .go{display:inline-flex;gap:6px;font-weight:700;color:var(--c);transition:gap .25s}
 .svc:hover .go{gap:12px}
+@keyframes pop{0%{transform:scale(0)}60%{transform:scale(1.3)}100%{transform:scale(1)}}
+.itrow{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:22px;animation:rise .7s .3s both}
+.itin{display:inline-flex;align-items:center;gap:10px;border:0;background:#fff;color:#14213d;padding:13px 22px;border-radius:99px;font:inherit;font-weight:700;cursor:pointer;box-shadow:0 10px 24px rgba(0,0,0,.25);transition:transform .25s,box-shadow .25s}
+.itin:hover{transform:translateY(-3px) scale(1.03);box-shadow:0 16px 30px rgba(0,0,0,.35)}
+.itin:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
+.itin svg{width:20px;height:20px;stroke:#2a6df4;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.count{background:#2a6df4;color:#fff;min-width:24px;height:24px;padding:0 7px;border-radius:99px;display:grid;place-items:center;font-size:.8rem;animation:pop .5s both}
+.next{color:#d3def5;font-size:.95rem}.next b{color:#fff}
+.upc{position:relative;z-index:2;max-width:1080px;margin:0 auto 48px;background:#fff;color:#14213d;border-radius:20px;padding:22px 24px;box-shadow:0 18px 40px rgba(0,0,0,.25);animation:rise .7s .5s both}
+.upc-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.upc-head h2{margin:0;font-size:1.15rem}
+.lnk{border:0;background:none;color:#2a6df4;font:inherit;font-weight:700;cursor:pointer;transition:transform .2s}
+.lnk:hover{transform:translateX(4px)}
+.upc-none{margin:0;color:#5b6784}
+.upc-item{display:flex;align-items:center;gap:14px;width:100%;border:0;background:#f3f6fc;border-radius:14px;padding:12px 14px;margin-bottom:10px;text-align:left;font:inherit;color:inherit;cursor:pointer;animation:rise .5s both;transition:transform .2s,box-shadow .2s}
+.upc-item:hover{transform:translateX(6px);box-shadow:0 8px 20px rgba(20,33,61,.12)}
+.upc-item:focus-visible,.lnk:focus-visible{outline:3px solid #2a6df4;outline-offset:2px}
+.uico{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-size:1.3rem;flex:none}
+.upc-item .txt{display:flex;flex-direction:column;min-width:0}
+.upc-item small{color:#5b6784}
+.when{margin-left:auto;font-weight:700;color:#2a6df4;white-space:nowrap}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 `;
+
+const EVENT = {
+  accommodation: { icon: "🏨", color: "#2a6df4" },
+  transport: { icon: "🚌", color: "#0d9488" },
+  restaurant: { icon: "🍽️", color: "#ea580c" },
+  event: { icon: "🎶", color: "#7c3aed" },
+};
 
 const SERVICES = [
   { to: "/accommodation", title: "Accommodation", text: "Hotels, homestays, apartments and resorts across Sarawak.", cta: "Search stays", color: "#2a6df4",
@@ -49,10 +80,13 @@ const SERVICES = [
     icon: <svg viewBox="0 0 24 24"><path d="M6 3v7a2 2 0 004 0V3M8 12v9M17 3c-2.2 1.8-3 4.2-3 8h3v10" /></svg> },
 ];
 
-export default function LandingPage({ user, onLogout }) {
+export default function LandingPage({ user, onLogout, bookings = [], onItinerary, savedEvents = [], onToggleEvent }) {
+  const upcoming = upcomingItinerary(bookings, savedEvents);
+  const whatsOn = nextEvents(4);
+  const next = upcoming[0];
   return (
     <>
-      <style>{css}</style>
+      <style>{css + eventCss}</style>
       <div className="land">
         <span className="orb o1" /><span className="orb o2" />
         <nav className="nav" aria-label="Account">
@@ -70,6 +104,16 @@ export default function LandingPage({ user, onLogout }) {
           <p className="eyebrow">Welcome back</p>
           <h1>Hi <span>{user.name}</span>, where to next?</h1>
           <p className="sub">Choose a service to get started.</p>
+          <div className="itrow">
+            <button className="itin" onClick={onItinerary}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>
+              My itinerary
+              {upcoming.length > 0 && <span className="count" key={upcoming.length}>{upcoming.length}</span>}
+            </button>
+            {next
+              ? <span className="next">Next: <b>{next.title}</b> · {formatDate(next.date)}{next.time ? ` · ${next.time}` : ""}</span>
+              : <span className="next">No bookings yet. Pick a service below to plan your trip.</span>}
+          </div>
         </header>
 
         <section className="cards" aria-label="Services">
@@ -80,6 +124,31 @@ export default function LandingPage({ user, onLogout }) {
               <p>{s.text}</p>
               <span className="go">{s.cta} <span aria-hidden="true">→</span></span>
             </Link>
+          ))}
+        </section>
+
+        <section className="upc" aria-label="Your upcoming events">
+          <div className="upc-head">
+            <h2>Your upcoming events</h2>
+            <button className="lnk" onClick={onItinerary}>View all →</button>
+          </div>
+          {upcoming.length === 0 ? (
+            <p className="upc-none">No upcoming events yet. Book a stay, a ride or a table and it will show up here.</p>
+          ) : (
+            upcoming.slice(0, 3).map((e, i) => (
+              <button className="upc-item" key={e.id} onClick={onItinerary} style={{ animationDelay: `${0.55 + i * 0.1}s` }}>
+                <span className="uico" style={{ background: `color-mix(in srgb, ${EVENT[e.kind].color} 16%, white)` }} aria-hidden="true">{EVENT[e.kind].icon}</span>
+                <span className="txt"><b>{e.title}</b><small>{formatDate(e.date)}{e.time ? ` · ${e.time}` : ""}</small></span>
+                <span className="when">{relativeDay(e.date)}</span>
+              </button>
+            ))
+          )}
+        </section>
+
+        <section className="upc" aria-label="What's on in Sarawak" style={{ marginTop: -24 }}>
+          <div className="upc-head"><h2>🎶 What's on in Sarawak</h2></div>
+          {whatsOn.map((e, i) => (
+            <EventRow key={e.id} event={e} delay={i * 70} saved={savedEvents.includes(e.id)} onToggle={onToggleEvent} />
           ))}
         </section>
       </div>
