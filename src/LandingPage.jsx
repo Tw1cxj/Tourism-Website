@@ -72,6 +72,8 @@ const EVENT = {
 };
 
 const SERVICES = [
+  { to: "/travel-information", title: "Travel Information", text: "Division guides, travel essentials and visitor alerts for your Sarawak trip.", cta: "Explore information", color: "#2a6df4",
+    icon: <svg viewBox="0 0 24 24"><path d="M4 3h16v18H4zM8 7h8M8 11h8M8 15h5" /></svg> },
   { to: "/accommodation", title: "Accommodation", text: "Hotels, homestays, apartments and resorts across Sarawak.", cta: "Search stays", color: "#2a6df4",
     icon: <svg viewBox="0 0 24 24"><path d="M3 20V8l9-5 9 5v12M9 20v-6h6v6" /></svg> },
   { to: "/transportation", title: "Transportation", text: "Express buses between towns and E-hailing rides across Sarawak.", cta: "Find a ride", color: "#0d9488",
