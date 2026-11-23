@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { DEFAULT_ADMIN, DEFAULT_VENDOR } from "./domain";
+import { loginAccount, registerAccount } from "./Accounts";
 
-// Set to false when your real backend API is ready
+// true = only registered accounts (plus the demo staff and demo vendor below) can log in.
+// Set to false when your real backend API is ready.
 const DEMO_MODE = true;
 const DEMO_STAFF = [
   { id: 1, name: 'Administrator', email: DEFAULT_ADMIN.email, password: DEFAULT_ADMIN.password, staffRole: 'system' },
@@ -160,14 +162,25 @@ export function LoginPage({ onSwitch, onLoggedIn }) {
     try {
       if (DEMO_MODE) {
         await new Promise((r) => setTimeout(r, 600));
-        if (form.password === "wrong") throw new Error("Email, password or account type is incorrect.");
-        const staff = DEMO_STAFF.find((account) => account.email === form.email.trim().toLowerCase() && account.password === form.password);
-        if (role === "admin" && !staff)
-          throw new Error("Invalid admin email or password.");
-        if (role === "vendor" && (form.email.trim().toLowerCase() !== DEFAULT_VENDOR.email || form.password !== DEFAULT_VENDOR.password))
-          throw new Error("Invalid vendor email or password.");
-        const name = role === "admin" ? staff.name : form.email.split("@")[0];
-        onLoggedIn?.({ user: { id: role === "admin" ? staff.id : role === "vendor" ? DEFAULT_VENDOR.id : 200, name, email: form.email.trim(), role, ...(role === "admin" ? { staffRole: staff.staffRole } : {}) } });
+        const email = form.email.trim().toLowerCase();
+
+        // 1. Admin tab: only the demo staff accounts
+        if (role === "admin") {
+          const staff = DEMO_STAFF.find((account) => account.email === email && account.password === form.password);
+          if (!staff) throw new Error("Invalid admin email or password.");
+          onLoggedIn?.({ user: { id: staff.id, name: staff.name, email: form.email.trim(), role, staffRole: staff.staffRole } });
+          return;
+        }
+
+        // 2. Built-in demo vendor
+        if (role === "vendor" && email === DEFAULT_VENDOR.email && form.password === DEFAULT_VENDOR.password) {
+          onLoggedIn?.({ user: { id: DEFAULT_VENDOR.id, name: form.email.split("@")[0], email: form.email.trim(), role } });
+          return;
+        }
+
+        // 3. Everyone else must have registered first
+        const user = await loginAccount({ email: form.email, password: form.password, role });
+        onLoggedIn?.({ user });
         return;
       }
       // TODO: replace with your real API call
@@ -236,7 +249,11 @@ export function RegisterPage({ onSwitch }) {
     setBanner(null);
     try {
       if (DEMO_MODE) {
-        await new Promise((r) => setTimeout(r, 600));
+        // Saves the account in this browser so it can log in later
+        await registerAccount({
+          name: form.name, email: form.email, password: form.password, role, businessName: form.businessName,
+          reserved: [...DEMO_STAFF.map((s) => s.email), DEFAULT_VENDOR.email],
+        });
         setBanner({ ok: true, text: "Account created. You can log in now." });
         return;
       }
