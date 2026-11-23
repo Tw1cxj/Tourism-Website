@@ -1,3 +1,4 @@
+import useSearchTelemetry from "./useSearchTelemetry";
 import { useEffect, useMemo, useState } from "react";
 import { TransportCatalog, TRANSPORT_TYPES, sampleTransport } from "./domain";
 import { serviceCss, Hero, Skeleton, Empty, HeartButton, Thumb } from "./ServiceShared";
@@ -10,6 +11,7 @@ const DEFAULTS = { query: "", type: "", maxPrice: 100, seats: 1, sort: "recommen
 
 export default function TransportPage({ items = sampleTransport, user, onLogout, onBack, onBook }) {
   const [filters, setFilters] = useState(DEFAULTS);
+  useSearchTelemetry(user, "transport", filters);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState([]);
   const catalog = useMemo(() => new TransportCatalog(items), [items]);
@@ -79,6 +81,7 @@ export default function TransportPage({ items = sampleTransport, user, onLogout,
                   </Thumb>
                   <div className="body">
                     <h3>{t.name}</h3>
+                  <p style={{ color: t.verificationStatus === "Verified" ? "#17633c" : "#8a5600", fontSize: 14 }}>{t.verificationStatus ?? "Verification overdue"}</p>
                     <p className="loc">{t.location.toString()}</p>
                     <div className="tags">{t.features.map((f) => <span key={f}>{f}</span>)}</div>
                     <div className="row">

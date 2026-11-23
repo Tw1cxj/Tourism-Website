@@ -3,6 +3,11 @@ import { DEFAULT_ADMIN, DEFAULT_VENDOR } from "./domain";
 
 // Set to false when your real backend API is ready
 const DEMO_MODE = true;
+const DEMO_STAFF = [
+  { id: 1, name: 'Administrator', email: DEFAULT_ADMIN.email, password: DEFAULT_ADMIN.password, staffRole: 'system' },
+  { id: 1001, name: 'Content Administrator', email: 'content@stayfinder.com', password: 'content123', staffRole: 'content' },
+  { id: 1002, name: 'Association Management', email: 'management@stayfinder.com', password: 'manage123', staffRole: 'management' },
+];
 
 /* ---------- Styles (plain CSS, no extra libraries) ---------- */
 const css = `
@@ -156,12 +161,13 @@ export function LoginPage({ onSwitch, onLoggedIn }) {
       if (DEMO_MODE) {
         await new Promise((r) => setTimeout(r, 600));
         if (form.password === "wrong") throw new Error("Email, password or account type is incorrect.");
-        if (role === "admin" && (form.email.trim().toLowerCase() !== DEFAULT_ADMIN.email || form.password !== DEFAULT_ADMIN.password))
+        const staff = DEMO_STAFF.find((account) => account.email === form.email.trim().toLowerCase() && account.password === form.password);
+        if (role === "admin" && !staff)
           throw new Error("Invalid admin email or password.");
         if (role === "vendor" && (form.email.trim().toLowerCase() !== DEFAULT_VENDOR.email || form.password !== DEFAULT_VENDOR.password))
           throw new Error("Invalid vendor email or password.");
-        const name = role === "admin" ? "Administrator" : form.email.split("@")[0];
-        onLoggedIn?.({ user: { id: role === "admin" ? 1 : role === "vendor" ? DEFAULT_VENDOR.id : 200, name, email: form.email.trim(), role } });
+        const name = role === "admin" ? staff.name : form.email.split("@")[0];
+        onLoggedIn?.({ user: { id: role === "admin" ? staff.id : role === "vendor" ? DEFAULT_VENDOR.id : 200, name, email: form.email.trim(), role, ...(role === "admin" ? { staffRole: staff.staffRole } : {}) } });
         return;
       }
       // TODO: replace with your real API call

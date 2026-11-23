@@ -1,6 +1,14 @@
 /* ============ User classes ============ */
 export const ROLES = { USER: "user", VENDOR: "vendor", ADMIN: "admin" };
 
+export const ATTRACTION_TYPES = ['Nature', 'Culture', 'Museum', 'Adventure'];
+export class Attraction {
+  constructor({ id, vendorId, name, type, location, entryFee = 0, openingHours = '', suggestedMinutes = 60, accessibility = '', features = [], rating = 0, image = '' }) {
+    Object.assign(this, { id, vendorId, name, type, entryFee, openingHours, suggestedMinutes, accessibility, features, rating, image });
+    this.location = location instanceof Location ? location : new Location(location);
+  }
+}
+
 // Demo default admin login. In production, check this on your backend and change the password after first login.
 export const DEFAULT_ADMIN = { email: "admin@stayfinder.com", password: "admin123" };
 
@@ -45,7 +53,7 @@ export class Vendor extends User {
 
 // Admin: can manage everything
 export class Admin extends User {
-  constructor(data) { super({ ...data, role: ROLES.ADMIN }); }
+  constructor(data) { super({ ...data, role: ROLES.ADMIN }); this.staffRole = data.staffRole ?? "system"; }
   canManageListing() { return true; }
   homePath() { return "/admin"; }
 }

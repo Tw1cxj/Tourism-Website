@@ -1,3 +1,4 @@
+import useSearchTelemetry from "./useSearchTelemetry";
 import { useEffect, useMemo, useState } from "react";
 import { RestaurantCatalog, RESTAURANT_CUISINES, sampleRestaurants } from "./domain";
 import { serviceCss, Hero, Skeleton, Empty, HeartButton, Thumb } from "./ServiceShared";
@@ -14,6 +15,7 @@ const DEFAULTS = { query: "", cuisine: "", maxLevel: 3, dietary: "", sort: "reco
 
 export default function RestaurantPage({ items = sampleRestaurants, user, onLogout, onBack, onBook }) {
   const [filters, setFilters] = useState(DEFAULTS);
+  useSearchTelemetry(user, "restaurant", filters);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState([]);
   const catalog = useMemo(() => new RestaurantCatalog(items), [items]);
@@ -90,6 +92,7 @@ export default function RestaurantPage({ items = sampleRestaurants, user, onLogo
                   </Thumb>
                   <div className="body">
                     <h3>{r.name}</h3>
+                  <p style={{ color: r.verificationStatus === "Verified" ? "#17633c" : "#8a5600", fontSize: 14 }}>{r.verificationStatus ?? "Verification overdue"}</p>
                     <p className="loc">{r.location.toString()} · {r.hours}</p>
                     <div className="tags">{[...r.dietary, ...r.features].map((f) => <span key={f}>{f}</span>)}</div>
                     <div className="row">

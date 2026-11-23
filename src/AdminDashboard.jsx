@@ -1,188 +1,82 @@
-import { useEffect, useMemo, useState } from "react";
-import { sampleAccommodations, sampleUsers, ACCOMMODATION_TYPES } from "./domain";
+import ReadOnlyBookings from './ReadOnlyBookings';
+import TravelArticle from './TravelArticle';
+import { reviewOverdue } from './travelContent';
+import './travelInformation.css';
+import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import useTourismStore from './useTourismStore';
+import { CATEGORY_LABELS, publicationStatus, verificationOverdue } from './tourismStore';
+import { canAdmin, locationText } from './governance';
+import { Icon, Badge, Empty, Feedback, DataTable, RecordEditor, Confirm } from './adminUI';
+import ReviewDialog from './AdminListingReview';
+import { eventFields, informationFields, locationFields, withTranslations, contentValues, EnquiryThread, ReviewModeration, ReportsPanel } from './governancePanels';
+import './admin.css';
 
-const css = `
-*{box-sizing:border-box}
-body{margin:0;font-family:"Segoe UI",system-ui,sans-serif;color:#14213d;background:#f3f6fc}
-@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
-@keyframes slideIn{from{opacity:0;transform:translateX(-20px)}to{opacity:1;transform:none}}
-@keyframes grow{from{width:0}to{width:var(--w)}}
-@keyframes rowIn{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}
-.adm{display:grid;grid-template-columns:250px 1fr;min-height:100vh}
-.side{background:linear-gradient(180deg,#0f1b38,#14285a);color:#fff;padding:24px 16px;display:flex;flex-direction:column;gap:6px;animation:slideIn .5s both}
-.side .brand{display:flex;align-items:center;gap:10px;font-weight:700;margin:0 8px 6px}
-.side .tag{margin:0 8px 22px;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:#7dd3fc}
-.logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#2a6df4,#16b8a6);display:grid;place-items:center}
-.logo svg{width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
-.tab{position:relative;text-align:left;border:0;background:transparent;color:#b8c4de;padding:11px 14px;border-radius:10px;font:inherit;cursor:pointer;transition:background .2s,color .2s,transform .2s}
-.tab:hover{background:rgba(255,255,255,.08);color:#fff;transform:translateX(3px)}
-.tab[aria-current=page]{background:rgba(42,109,244,.35);color:#fff;font-weight:600}
-.tab:focus-visible,.btn:focus-visible,.out:focus-visible{outline:3px solid #7dd3fc;outline-offset:2px}
-.out{margin-top:auto;border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;padding:10px;border-radius:10px;font:inherit;font-weight:600;cursor:pointer;transition:background .2s,color .2s}
-.out:hover{background:#fff;color:#14213d}
-.main{padding:32px 36px;min-width:0}
-.main h1{margin:0 0 4px}.lead{margin:0 0 26px;color:#5b6784}
-.view{animation:rise .45s cubic-bezier(.2,.7,.2,1) both}
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:16px;margin-bottom:26px}
-.stat{background:#fff;border-radius:16px;padding:20px;box-shadow:0 2px 8px rgba(20,33,61,.08);animation:rise .5s both;transition:transform .25s,box-shadow .25s}
-.stat:hover{transform:translateY(-4px);box-shadow:0 12px 26px rgba(20,33,61,.14)}
-.stat span{color:#5b6784;font-size:.85rem}
-.stat strong{display:block;font-size:2.2rem;margin-top:4px;color:var(--c)}
-.panel{background:#fff;border-radius:16px;padding:22px;box-shadow:0 2px 8px rgba(20,33,61,.08)}
-.panel h2{margin:0 0 16px;font-size:1.05rem}
-.bar{display:grid;grid-template-columns:100px 1fr 28px;gap:12px;align-items:center;margin-bottom:12px;font-size:.9rem}
-.track{background:#eef2fb;border-radius:99px;height:12px;overflow:hidden}
-.fill{height:100%;border-radius:99px;background:linear-gradient(90deg,#2a6df4,#16b8a6);animation:grow 1s cubic-bezier(.2,.7,.2,1) both;width:var(--w)}
-.tools{display:flex;gap:12px;margin-bottom:14px}
-.tools input{flex:1;max-width:340px;padding:10px 12px;border:1px solid #c3cce0;border-radius:10px;font:inherit;transition:border-color .2s,box-shadow .2s}
-.tools input:focus{outline:none;border-color:#2a6df4;box-shadow:0 0 0 4px rgba(42,109,244,.15)}
-.wrap{overflow-x:auto}
-table{width:100%;border-collapse:collapse;min-width:560px}
-th{text-align:left;font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:#6b7896;padding:10px 12px;border-bottom:1px solid #e4e9f4}
-td{padding:12px;border-bottom:1px solid #eef1f8}
-tbody tr{animation:rowIn .4s both;transition:background .2s}
-tbody tr:hover{background:#f6f9ff}
-.pill{display:inline-block;padding:3px 10px;border-radius:99px;font-size:.78rem;font-weight:600;text-transform:capitalize}
-.r-admin{background:#ede9fe;color:#5b21b6}.r-vendor{background:#ffedd5;color:#9a3412}.r-user{background:#dbeafe;color:#1e40af}
-.s-active{background:#dcfce7;color:#166534}.s-suspended{background:#fee2e2;color:#991b1b}
-.btn{border:1px solid #c3cce0;background:#fff;padding:6px 12px;border-radius:8px;font:inherit;font-size:.82rem;cursor:pointer;margin-right:6px;transition:transform .15s,background .2s,color .2s}
-.btn:hover:not(:disabled){transform:translateY(-1px);background:#eef3ff}
-.btn.danger{color:#b3261e;border-color:#f3c6c3}.btn.danger:hover:not(:disabled){background:#b3261e;color:#fff}
-.btn:disabled{opacity:.4;cursor:not-allowed}
-.empty{text-align:center;color:#5b6784;padding:28px}
-@media(max-width:820px){.adm{grid-template-columns:1fr}.side{flex-direction:row;flex-wrap:wrap;align-items:center}.side .tag{display:none}.out{margin:0 0 0 auto}.main{padding:22px 16px}}
-@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
-`;
+const TABS=[['overview','Overview','Your publishing and support workspace.'],['providers','Providers','Verify the businesses behind Sarawak’s tourism experiences.'],['listings','Listings','Review submissions and keep published information current.'],['events','Events','Create, publish and maintain events across Sarawak.'],['locations','Locations','One consistent directory of divisions, towns and places.'],['reviews','Reviews','Moderate feedback fairly and maintain trusted ratings.'],['enquiries','Association enquiries','Respond to questions addressed to the Tourism Association.'],['information','Visitor information','Publish division guides, travel essentials and alerts.'],['bookings','Bookings','Read-only oversight of saved tourist reservations.'],['reports','Monthly reports','Understand recorded activity and export a monthly summary.'],['users','Accounts','Maintain the account records included in this prototype.']];
+const formatDate=(value)=>value?new Date(value).toLocaleDateString('en-GB'):'Not yet verified';
+const timestamp=(value)=>value?new Date(value).toLocaleString('en-GB',{dateStyle:'medium',timeStyle:'short'}):'Not specified';
+const text=(value)=>String(value??'').toLowerCase();
 
-function CountUp({ to }) {
-  const [n, setN] = useState(0);
-  useEffect(() => {
-    let frame, start;
-    const step = (t) => {
-      start = start ?? t;
-      const p = Math.min((t - start) / 800, 1);
-      setN(Math.round(to * p));
-      if (p < 1) frame = requestAnimationFrame(step);
-    };
-    frame = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(frame);
-  }, [to]);
-  return n;
-}
-
-export default function AdminDashboard({ user, onLogout }) {
-  const [tab, setTab] = useState("overview");
-  const [users, setUsers] = useState(sampleUsers);
-  const [listings, setListings] = useState(sampleAccommodations);
-  const [q, setQ] = useState("");
-
-  const shownUsers = useMemo(
-    () => users.filter((u) => `${u.name} ${u.email} ${u.role}`.toLowerCase().includes(q.trim().toLowerCase())),
-    [users, q]
-  );
-
-  const toggleStatus = (id) =>
-    setUsers((list) => list.map((u) => (u.id === id ? { ...u, status: u.status === "active" ? "suspended" : "active" } : u)));
-  const deleteUser = (u) => { if (window.confirm(`Delete ${u.name}?`)) setUsers((l) => l.filter((x) => x.id !== u.id)); };
-  const deleteListing = (a) => { if (window.confirm(`Remove ${a.name}?`)) setListings((l) => l.filter((x) => x.id !== a.id)); };
-
-  const stats = [
-    { label: "Total users", value: users.length, c: "#2a6df4" },
-    { label: "Vendors", value: users.filter((u) => u.role === "vendor").length, c: "#ea580c" },
-    { label: "Listings", value: listings.length, c: "#0d9488" },
-    { label: "Suspended", value: users.filter((u) => u.status === "suspended").length, c: "#dc2626" },
-  ];
-  const tabs = [["overview", "Overview"], ["users", "Manage users"], ["listings", "Manage listings"]];
-
-  return (
-    <>
-      <style>{css}</style>
-      <div className="adm">
-        <aside className="side">
-          <div className="brand"><span className="logo"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7M5 10v10h14V10M10 20v-6h4v6" /></svg></span>StayFinder</div>
-          <p className="tag">Admin panel</p>
-          {tabs.map(([key, label]) => (
-            <button key={key} className="tab" aria-current={tab === key ? "page" : undefined} onClick={() => setTab(key)}>{label}</button>
-          ))}
-          <button className="out" onClick={onLogout}>Log out</button>
-        </aside>
-
-        <main className="main">
-          <h1>{tabs.find((t) => t[0] === tab)[1]}</h1>
-          <p className="lead">Signed in as {user.name}</p>
-
-          <div className="view" key={tab}>
-            {tab === "overview" && (
-              <>
-                <div className="stats">
-                  {stats.map((s, i) => (
-                    <div className="stat" key={s.label} style={{ "--c": s.c, animationDelay: `${i * 80}ms` }}>
-                      <span>{s.label}</span><strong><CountUp to={s.value} /></strong>
-                    </div>
-                  ))}
-                </div>
-                <section className="panel">
-                  <h2>Listings by type</h2>
-                  {ACCOMMODATION_TYPES.map((t) => {
-                    const n = listings.filter((a) => a.type === t).length;
-                    return (
-                      <div className="bar" key={t}>
-                        <span>{t}</span>
-                        <div className="track"><div className="fill" style={{ "--w": `${listings.length ? (n / listings.length) * 100 : 0}%` }} /></div>
-                        <b>{n}</b>
-                      </div>
-                    );
-                  })}
-                </section>
-              </>
-            )}
-
-            {tab === "users" && (
-              <section className="panel">
-                <div className="tools"><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, email or role" aria-label="Search users" /></div>
-                <div className="wrap">
-                  <table>
-                    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
-                    <tbody>
-                      {shownUsers.map((u, i) => (
-                        <tr key={u.id} style={{ animationDelay: `${i * 40}ms` }}>
-                          <td>{u.name}</td><td>{u.email}</td>
-                          <td><span className={`pill r-${u.role}`}>{u.role}</span></td>
-                          <td><span className={`pill s-${u.status}`}>{u.status}</span></td>
-                          <td>
-                            <button className="btn" disabled={u.role === "admin"} onClick={() => toggleStatus(u.id)}>{u.status === "active" ? "Suspend" : "Activate"}</button>
-                            <button className="btn danger" disabled={u.role === "admin"} onClick={() => deleteUser(u)}>Delete</button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {shownUsers.length === 0 && <p className="empty">No users match your search.</p>}
-                </div>
-              </section>
-            )}
-
-            {tab === "listings" && (
-              <section className="panel">
-                <div className="wrap">
-                  <table>
-                    <thead><tr><th>Name</th><th>Type</th><th>Location</th><th>Price / night</th><th>Actions</th></tr></thead>
-                    <tbody>
-                      {listings.map((a, i) => (
-                        <tr key={a.id} style={{ animationDelay: `${i * 40}ms` }}>
-                          <td>{a.name}</td><td>{a.type}</td><td>{a.location.toString()}</td><td>RM{a.pricePerNight}</td>
-                          <td><button className="btn danger" onClick={() => deleteListing(a)}>Remove</button></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {listings.length === 0 && <p className="empty">No listings left.</p>}
-                </div>
-              </section>
-            )}
-          </div>
-        </main>
-      </div>
-    </>
-  );
+export default function AdminDashboard({user,onLogout}) {
+  const [state,repository]=useTourismStore();
+  const [params,setParams]=useSearchParams();
+  const requested=params.get('section') ?? 'overview';
+  const tab=canAdmin(user,requested)?requested:'overview';
+  const status=params.get('status') ?? 'all';
+  const setStatus=(value)=>setParams({section:tab,status:value});
+  const [query,setQuery]=useState(''),[category,setCategory]=useState('all');
+  const [modal,setModal]=useState(null),[notice,setNotice]=useState(null);
+  const heading=useRef(null),firstRender=useRef(true);
+  const tabs=TABS.filter(([area])=>canAdmin(user,area));
+  const current=tabs.find(([area])=>area===tab) ?? tabs[0];
+  useEffect(()=>{if(firstRender.current){firstRender.current=false;return;}heading.current?.focus();},[tab]);
+  const listings=Object.entries(state.listings).flatMap(([category,items])=>items.map((item)=>({...item,category})));
+  const associationEnquiries=state.enquiries.filter((e)=>e.recipientId===null);
+  const counts={providers:state.providers.filter((p)=>p.status==='pending').length,listings:listings.filter((l)=>l.status==='pending').length,reviews:state.reviews.filter((r)=>r.status==='pending').length,enquiries:associationEnquiries.filter((e)=>e.status==='submitted').length,overdue:listings.filter((l)=>l.published&&verificationOverdue(l)).length,published:listings.filter((l)=>publicationStatus(l,state.providers)!=='Not published').length};
+  const totalTasks=['providers','listings','reviews','enquiries'].filter((area)=>canAdmin(user,area)).reduce((total,area)=>total+counts[area],0);
+  const changeTab=(next,filter='all')=>{setParams({section:next,status:filter});setQuery('');setCategory('all');setNotice(null);};
+  const open=(value)=>{setNotice(null);setModal(value);};
+  const saved=(message='Changes saved successfully.')=>setNotice({text:message});
+  const perform=(operation)=>{try{operation(repository,user);saved('Decision saved. The related provider and visitor views are updated.');setModal(null);}catch(e){setNotice({error:true,text:e.message});}};
+  const finish=(operation,message)=>{operation();saved(message);setModal(null);};
+  const matched=(value)=>text(value).includes(text(query));
+  const listingRows=listings.filter((l)=>(category==='all'||l.category===category)&&(status==='all'||(status==='overdue'?l.published&&verificationOverdue(l):status==='published'?publicationStatus(l,state.providers)!=='Not published':l.status===status))&&matched(`${l.name} ${state.providers.find((p)=>p.id===l.vendorId)?.businessName}`));
+  const providerRows=state.providers.filter((p)=>(status==='all'||p.status===status)&&matched(`${p.businessName} ${p.email}`));
+  const eventRows=state.events.filter((e)=>(status==='all'||e.status===status)&&matched(`${e.title} ${e.organiser}`));
+  const locationRows=state.locations.filter((l)=>matched(locationText(l)));
+  const reviewRows=state.reviews.filter((r)=>(status==='all'||r.status===status)&&matched(`${r.authorName} ${r.comment} ${state.listings[r.category]?.find((l)=>l.id===r.listingId)?.name}`));
+  const enquiryRows=associationEnquiries.filter((e)=>(status==='all'||e.status===status)&&matched(`${e.reference} ${e.subject} ${e.authorName}`));
+  const infoRows=state.information.filter((a)=>(status==='all'||a.status===status)&&matched(`${a.title} ${a.kind}`));
+  const userRows=state.users.filter((u)=>matched(`${u.name} ${u.email} ${u.role}`));
+  const options={providers:[['pending','Pending review'],['verified','Verified'],['correction','Needs correction']],listings:[['pending','Pending review'],['approved','Approved'],['rejected','Rejected'],['published','Published'],['overdue','Verification overdue']],events:[['draft','Draft'],['published','Published'],['cancelled','Cancelled']],reviews:[['pending','Pending review'],['published','Published'],['removed','Removed']],enquiries:[['submitted','Submitted'],['answered','Answered'],['closed','Closed']],information:[['draft','Draft'],['published','Published'],['archived','Archived']]};
+  const filters=<div className="workspace-filters"><div className="search-field"><label htmlFor="workspace-search">Search {current[1].toLowerCase()}</label><input id="workspace-search" type="search" value={query} onChange={(e)=>setQuery(e.target.value)} placeholder="Search by name or keyword"/></div>{tab==='listings'&&<div><label htmlFor="category-filter">Category</label><select id="category-filter" value={category} onChange={(e)=>setCategory(e.target.value)}><option value="all">All categories</option>{Object.entries(CATEGORY_LABELS).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></div>}{options[tab]&&<div><label htmlFor="status-filter">Status</label><select id="status-filter" value={status} onChange={(e)=>setStatus(e.target.value)}><option value="all">All statuses</option>{options[tab].map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></div>}{(query||status!=='all'||category!=='all')&&<button className="quiet-button" onClick={()=>{setQuery('');setStatus('all');setCategory('all');}}>Clear filters</button>}</div>;
+  const noMatches=<Empty title="No matching records">Try another search or clear your filters. New submissions will appear here when they are received.</Empty>;
+  const newAction=tab==='events'?<button className="primary-button" onClick={()=>open({type:'event'})}>Create event</button>:tab==='locations'?<button className="primary-button" onClick={()=>open({type:'location'})}>Add location</button>:tab==='information'?<button className="primary-button" onClick={()=>open({type:'information'})}>Create information</button>:null;
+  const activeEnquiry=modal?.type==='enquiry'?state.enquiries.find((e)=>e.id===modal.id):null;
+  const activeReview=modal?.type==='review'?state.reviews.find((r)=>r.id===modal.id):null;
+  return <div className="admin-workspace"><a className="skip-link" href="#admin-main">Skip to main content</a>
+    <aside className="workspace-sidebar"><div className="workspace-brand"><span className="brand-mark" aria-hidden="true">S</span><div><strong>StayFinder</strong><small>Sarawak Tourism Association</small></div></div><p className="nav-group-title">Workspace</p><nav className="workspace-navigation" aria-label="Administration">{tabs.map(([key,label])=><button className="workspace-nav-button" key={key} aria-current={current[0]===key?'page':undefined} onClick={()=>changeTab(key)}><Icon name={key}/><span>{label}</span>{counts[key]>0&&<span className="nav-count" aria-label={`${counts[key]} awaiting action`}>{counts[key]}</span>}</button>)}</nav><div className="workspace-profile"><div className="workspace-profile-card"><span className="workspace-avatar" aria-hidden="true">{user.name?.slice(0,1).toUpperCase()}</span><div><strong>{user.name}</strong><small>{({system:'System administrator',content:'Content administrator',management:'Management'})[user.staffRole??'system']}</small></div></div><button className="workspace-signout" onClick={onLogout}><Icon name="logout"/>Log out</button></div></aside>
+    <div className="workspace-main"><header className="workspace-topbar"><span>Administration <span aria-hidden="true"> / </span> <strong>{current[1]}</strong></span><span className="workspace-environment">Sarawak Tourism Association</span></header><main id="admin-main" className="workspace-content" tabIndex={-1}><div className="workspace-page-heading"><div><h1 ref={heading} tabIndex={-1}>{current[1]}</h1><p>{current[2]}</p></div>{newAction}</div><Feedback notice={notice}/>
+    {tab==='overview'&&<><section className="workspace-hero"><div><p className="eyebrow">A trusted guide to Sarawak</p><h2>Good information makes better journeys.</h2><p>{totalTasks?`${totalTasks} submission${totalTasks===1?' needs':'s need'} your attention. Start with the review queues below.`:'Your review queues are up to date. Keep information fresh and help visitors plan with confidence.'}</p></div>{canAdmin(user,'listings')?<button className="primary-button" onClick={()=>changeTab('listings','pending')}>Review submissions</button>:<button className="primary-button" onClick={()=>changeTab('reports')}>View monthly report</button>}</section>
+      <div className="workspace-stat-grid">{[['Pending providers',counts.providers,'providers','pending','Business verification'],['Pending listings',counts.listings,'listings','pending','Ready for your review'],['Reviews to moderate',counts.reviews,'reviews','pending','Feedback awaiting a decision'],['Unanswered enquiries',counts.enquiries,'enquiries','submitted','Association inbox']].filter((item)=>canAdmin(user,item[2])).map(([label,count,target,filter,hint])=><button key={target} className="workspace-stat" onClick={()=>changeTab(target,filter)}><span className="workspace-stat-top">{label}<Icon name={target}/></span><strong>{count}</strong><small>{hint}</small></button>)}</div>
+      <div className="workspace-two-columns"><section className="workspace-panel"><div className="panel-heading"><h2>Recent activity</h2></div><div className="panel-body">{state.history.length?<ol className="activity-list">{state.history.slice(0,6).map((item,i)=><li key={`${item.at}-${i}`}><span className="activity-icon"><Icon name="check"/></span><div><p>{item.action}</p><small>{item.actorName} · {timestamp(item.at)}</small></div></li>)}</ol>:<Empty title="A fresh start">Submissions and decisions will appear here as your team works.</Empty>}</div></section><section className="workspace-panel"><div className="panel-heading"><h2>Keep your information current</h2></div><div className="panel-body">{canAdmin(user,'listings')&&<><div className="task-row"><div><strong>{counts.overdue} listings overdue</strong><small>Re-verify listings every 90 days.</small></div><button className="quiet-button" onClick={()=>changeTab('listings','overdue')}>Review</button></div><div className="task-row"><div><strong>{counts.published} published listings</strong><small>Available on the visitor site.</small></div><button className="quiet-button" onClick={()=>changeTab('listings','published')}>View</button></div></>}{canAdmin(user,'events')&&<div className="task-row"><div><strong>{state.events.filter((e)=>e.status==='published').length} published events</strong><small>Maintain dates and cancellation notices for the events module.</small></div><button className="quiet-button" onClick={()=>changeTab('events')}>Manage</button></div>}{canAdmin(user,'reports')&&<div className="task-row"><div><strong>Monthly activity</strong><small>Export a summary for Association management.</small></div><button className="quiet-button" onClick={()=>changeTab('reports')}>Report</button></div>}</div></section></div><p className="workspace-policy"><strong>Publication policy.</strong> Only verified providers can publish approved listings. Pending revisions keep the approved version live. After 90 days, listings remain visible with a verification-overdue label until re-verified.</p></>}
+    {tab==='providers'&&<section className="workspace-panel">{filters}{providerRows.length?<DataTable caption="Service provider verification" headings={['Business','Contact','Verification','Last verified','Action']}>{providerRows.map((p)=><tr key={p.id}><td><strong>{p.businessName}</strong><small>{p.registrationNumber||'Business details incomplete'}</small></td><td>{p.contactName}<small>{p.email}</small></td><td><Badge status={p.status}/></td><td>{formatDate(p.verifiedAt)}</td><td><button className="quiet-button" onClick={()=>open({type:'provider',id:p.id})}>Review provider</button></td></tr>)}</DataTable>:noMatches}</section>}
+    {tab==='listings'&&<section className="workspace-panel">{filters}{listingRows.length?<DataTable caption="Tourism listing submissions" headings={['Listing','Provider','Submission','Publication','Actions']}>{listingRows.map((l)=><tr key={`${l.category}-${l.id}`}><td><strong>{l.name}</strong><small>{CATEGORY_LABELS[l.category]} · {l.location.city}</small></td><td>{state.providers.find((p)=>p.id===l.vendorId)?.businessName??'Unknown provider'}</td><td><Badge status={l.status}/><small>{l.decisionReason}</small></td><td>{publicationStatus(l,state.providers)}<small>{formatDate(l.verifiedAt)}</small></td><td><button className="quiet-button" onClick={()=>open({type:'listing',category:l.category,id:l.id})}>Review</button> <button className="danger-button" onClick={()=>open({type:'confirm',title:'Remove listing?',description:`Remove “${l.name}” and its published version? Linked reviews or enquiries prevent removal.`,action:()=>repository.removeListing(user,l.category,l.id)})}>Remove</button></td></tr>)}</DataTable>:noMatches}</section>}
+    {tab==='events'&&<section className="workspace-panel">{filters}{eventRows.length?<DataTable caption="Events" headings={['Event','When','Location','Status','Action']}>{eventRows.map((e)=><tr key={e.id}><td><strong>{e.title}</strong><small>{e.organiser}</small></td><td>{timestamp(e.start)}<small>Ends {timestamp(e.end)}</small></td><td>{locationText(state.locations.find((l)=>l.id===e.locationId))}</td><td><Badge status={e.status}/></td><td><button className="quiet-button" onClick={()=>open({type:'event',record:e})}>Edit event</button></td></tr>)}</DataTable>:<Empty title={query||status!=='all'?'No matching events':'Bring Sarawak’s events to life'}>Create an event, choose its location and dates, then publish it for visitors.</Empty>}</section>}
+    {tab==='locations'&&<section className="workspace-panel">{filters}{locationRows.length?<DataTable caption="Shared locations" headings={['Place','Town','Division','Map coordinates','Actions']}>{locationRows.map((l)=><tr key={l.id}><td><strong>{l.name}</strong><small>{l.address}</small></td><td>{l.town}</td><td>{l.division}</td><td>{l.latitude!=null?`${l.latitude}, ${l.longitude}`:'Not provided'}</td><td><button className="quiet-button" onClick={()=>open({type:'location',record:l})}>Edit</button> <button className="danger-button" onClick={()=>open({type:'confirm',title:'Remove location?',description:`Remove “${l.name}”? Locations used by listings, events or visitor information cannot be removed.`,action:()=>repository.removeLocation(user,l.id)})}>Remove</button></td></tr>)}</DataTable>:noMatches}</section>}
+    {tab==='reviews'&&<section className="workspace-panel">{filters}{reviewRows.length?<DataTable caption="Review moderation queue" headings={['Review','Listing','Rating','Status','Action']}>{reviewRows.map((r)=><tr key={r.id}><td><strong>{r.authorName}</strong><small>{r.comment.slice(0,95)}{r.comment.length>95?'…':''}</small></td><td>{state.listings[r.category]?.find((l)=>l.id===r.listingId)?.name??'Unavailable'}</td><td><span className="rating-score">{r.rating} / 5</span></td><td><Badge status={r.status}/></td><td><button className="quiet-button" onClick={()=>open({type:'review',id:r.id})}>Review feedback</button></td></tr>)}</DataTable>:<Empty title="No reviews awaiting your attention">Tourist submissions appear here for moderation. Published reviews update the listing’s average rating.</Empty>}</section>}
+    {tab==='enquiries'&&<section className="workspace-panel">{filters}{enquiryRows.length?<DataTable caption="Association enquiries" headings={['Reference and subject','From','Received','Status','Action']}>{enquiryRows.map((e)=><tr key={e.id}><td><strong>{e.subject}</strong><small>{e.reference}</small></td><td>{e.authorName}</td><td>{timestamp(e.createdAt)}</td><td><Badge status={e.status}/></td><td><button className="quiet-button" onClick={()=>open({type:'enquiry',id:e.id})}>Open conversation</button></td></tr>)}</DataTable>:<Empty title="Your Association inbox is clear">General visitor questions arrive here. Listing-specific enquiries go to the owning service provider.</Empty>}</section>}
+    {tab==='information'&&<section className="workspace-panel">{filters}{infoRows.length?<DataTable caption="Visitor information" headings={['Title','Type','Location','Status','Action']}>{infoRows.map((a)=><tr key={a.id}><td><strong>{a.title}</strong><small>{(a.summary||a.description).slice(0,85)}</small>{reviewOverdue(a)&&<small style={{color:'#92400e'}}>Content review overdue</small>}</td><td>{{guide:'Division guide',essential:'Travel essential',alert:'Travel alert'}[a.kind]}</td><td>{a.locationId?locationText(state.locations.find((l)=>l.id===a.locationId)):'All Sarawak'}</td><td><Badge status={a.status}/></td><td><button className="quiet-button" onClick={()=>open({type:'information',record:a})}>Edit information</button></td></tr>)}</DataTable>:<Empty title="Help visitors discover Sarawak">Publish division guides, travel essentials and alerts, with optional Malay and Chinese translations.</Empty>}</section>}
+    {tab==='bookings'&&<ReadOnlyBookings state={state} repository={repository} user={user}/>}
+    {tab==='reports'&&<ReportsPanel state={state}/>}
+    {tab==='users'&&<section className="workspace-panel">{filters}<p className="workspace-policy" style={{margin:20}}>These are prototype account records. Sign-in still uses the project’s demonstration accounts.</p>{userRows.length?<DataTable caption="Account records" headings={['Name','Email','Role','Status','Actions']}>{userRows.map((u)=><tr key={u.id}><td><strong>{u.name}</strong></td><td>{u.email}</td><td>{u.role}</td><td>{u.status}</td><td><button className="quiet-button" disabled={u.role==='admin'} onClick={()=>perform((repo,actor)=>repo.changeUser(actor,u.id))}>{u.status==='active'?'Suspend':'Activate'}</button> <button className="danger-button" disabled={u.role==='admin'} onClick={()=>open({type:'confirm',title:'Remove account record?',description:`Remove the record for ${u.name}? This does not change demonstration sign-in credentials.`,action:()=>repository.changeUser(user,u.id,true)})}>Remove</button></td></tr>)}</DataTable>:noMatches}</section>}
+    <footer className="workspace-footer">Sarawak Tourism Information System · Association administration</footer></main></div>
+    {modal&&['provider','listing'].includes(modal.type)&&<ReviewDialog selection={modal} state={state} onClose={()=>setModal(null)} perform={perform} message={notice}/>}
+    {modal?.type==='event'&&<RecordEditor title={modal.record?'Edit event':'Create event'} fields={eventFields(state)} initial={withTranslations(modal.record)} onClose={()=>setModal(null)} onSave={(values)=>finish(()=>repository.saveEvent(user,modal.record?.id,contentValues(values)),'Event saved. Published details and saved-event notices are updated.')}/>}
+    {modal?.type==='location'&&<RecordEditor title={modal.record?'Edit location':'Add location'} fields={locationFields} initial={modal.record} onClose={()=>setModal(null)} onSave={(values)=>finish(()=>repository.saveLocation(user,modal.record?.id,values),'Location saved. Linked listing locations are updated.')}/>}
+    {modal?.type==='information'&&<RecordEditor title={modal.record?'Edit visitor information':'Create visitor information'} fields={informationFields(state)} renderPreview={(values)=><TravelArticle article={contentValues(values)} locations={state.locations} preview/>} initial={withTranslations(modal.record)} onClose={()=>setModal(null)} onSave={(values)=>finish(()=>repository.saveInformation(user,modal.record?.id,contentValues(values)),'Visitor information saved.')}/>}
+    {modal?.type==='confirm'&&<Confirm title={modal.title} description={modal.description} onClose={()=>setModal(null)} onConfirm={()=>finish(modal.action,'Record removed.')}/>}
+    {activeReview&&<ReviewModeration review={activeReview} state={state} user={user} repository={repository} onClose={()=>setModal(null)} onSaved={saved}/>}
+    {activeEnquiry&&<EnquiryThread record={activeEnquiry} user={user} repository={repository} onClose={()=>setModal(null)} onSaved={saved}/>}
+  </div>;
 }

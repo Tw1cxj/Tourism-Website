@@ -1,3 +1,4 @@
+import useSearchTelemetry from "./useSearchTelemetry";
 import { useEffect, useMemo, useState } from "react";
 import { AccommodationCatalog, ACCOMMODATION_TYPES, sampleAccommodations } from "./domain";
 
@@ -160,6 +161,7 @@ const DEFAULTS = { query: "", type: "", maxPrice: 600, guests: 1, sort: "recomme
 
 export default function SearchPage({ accommodations = sampleAccommodations, user, onLogout, onBack, onBook }) {
   const [filters, setFilters] = useState(DEFAULTS);
+  useSearchTelemetry(user, "accommodation", filters);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState([]);
   const catalog = useMemo(() => new AccommodationCatalog(accommodations), [accommodations]);
@@ -260,6 +262,7 @@ export default function SearchPage({ accommodations = sampleAccommodations, user
                 </div>
                 <div className="body">
                   <h3>{a.name}</h3>
+                  <p style={{ color: a.verificationStatus === "Verified" ? "#17633c" : "#8a5600", fontSize: 14 }}>{a.verificationStatus ?? "Verification overdue"}</p>
                   <p className="loc">{a.location.toString()}</p>
                   <div className="tags">{a.amenities.map((m) => <span key={m}>{m}</span>)}</div>
                   <div className="row">

@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  sampleAccommodations, sampleTransport, sampleRestaurants,
+
   ACCOMMODATION_TYPES, TRANSPORT_TYPES, RESTAURANT_CUISINES,
 } from "./domain";
 
-const STORAGE_KEY = "vendorListings-v2"; // bumped so older saved data with other owners is not reused
-const STATUS = { VERIFIED: "verified", PENDING: "pending" };
-const STATUS_LABEL = { verified: "✔ Verified", pending: "⏳ Pending approval" };
+import useTourismStore from "./useTourismStore";
+import BusinessProfile from "./BusinessProfile";
+import { locationText } from "./governance";
+import { publicationStatus } from "./tourismStore";
+const STATUS = { PENDING: "pending" };
+const STATUS_LABEL = { approved: "Approved", pending: "Pending approval", rejected: "Rejected" };
 const DIETARY = ["Halal", "Vegetarian", "Vegan"];
 const PRICE_LEVELS = [["1", "Under RM20"], ["2", "RM20 – RM50"], ["3", "RM50 and up"]];
 
@@ -74,6 +77,15 @@ const CATEGORIES = {
   },
 };
 
+function categoryConfig(category, locations) {
+  const base = CATEGORIES[category];
+  return { ...base,
+    fields: base.fields.map((f) => f.name === 'city' ? { ...f, label: 'Managed location', kind: 'select', options: locations.map((l) => [String(l.id), locationText(l)]) } : f),
+    toForm: (listing) => ({ ...base.toForm(listing), city: String(listing.locationId ?? locations.find((l) => l.town === listing.location.city)?.id ?? '') }),
+    fromForm: (values) => { const place = locations.find((l) => l.id === Number(values.city)); return { ...base.fromForm({ ...values, city: place?.town ?? '' }), locationId: place?.id }; },
+  };
+}
+
 function splitTags(text) {
   return text.split(",").map((t) => t.trim()).filter(Boolean);
 }
@@ -93,22 +105,6 @@ function validate(fields, values) {
     if (f.kind === "url" && text && !/^https?:\/\/\S+$/i.test(text)) errs[f.name] = "Enter a link starting with http:// or https://.";
   }
   return errs;
-}
-
-/* ---------- Storage (replace with your API) ---------- */
-const plain = (list) => JSON.parse(JSON.stringify(list));
-
-function seed() {
-  const mark = (list) => plain(list).map((l) => ({ ...l, status: STATUS.VERIFIED }));
-  return { accommodation: mark(sampleAccommodations), transport: mark(sampleTransport), restaurant: mark(sampleRestaurants) };
-}
-
-function loadStore() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (saved?.accommodation && saved?.transport && saved?.restaurant) return saved;
-  } catch { /* fall through to sample data */ }
-  return seed();
 }
 
 /* ---------- Styles ---------- */
@@ -257,9 +253,9 @@ function Field({ f, value, error, onChange }) {
   );
 }
 
-function ListingDialog({ cat, listing, saving, onSave, onClose }) {
+function ListingDialog({ cat, listing, saving, onSave, onClose, locations }) {
   const ref = useRef(null);
-  const cfg = CATEGORIES[cat];
+  const cfg = categoryConfig(cat, locations);
   const [values, setValues] = useState(() => (listing ? cfg.toForm(listing) : { ...Object.fromEntries(cfg.fields.map((f) => [f.name, f.kind === "checks" ? [] : ""])), ...cfg.blank }));
   const [errors, setErrors] = useState({});
 
@@ -313,14 +309,12 @@ function ListingDialog({ cat, listing, saving, onSave, onClose }) {
 /* ---------- Page ---------- */
 export default function VendorDashboard({ user, onLogout }) {
   const [tab, setTab] = useState("accommodation");
-  const [store, setStore] = useState(loadStore);
+  const [shared, repository] = useTourismStore();
+  const store = shared.listings;
+  const provider = shared.providers.find((p) => p.id === user.id);
   const [dialog, setDialog] = useState(null); // { cat, listing | null }
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState(null); // { text, warn }
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
-  }, [store]);
 
   const mine = useMemo(
     () => Object.fromEntries(Object.keys(CATEGORIES).map((c) => [c, store[c].filter((l) => user.canManageListing(l))])),
@@ -328,38 +322,29 @@ export default function VendorDashboard({ user, onLogout }) {
   );
   const all = Object.values(mine).flat();
   const pending = all.filter((l) => l.status === STATUS.PENDING).length;
-  const cfg = CATEGORIES[tab];
+  const cfg = categoryConfig(tab, shared.locations);
   const rows = mine[tab];
 
-  const save = async (data) => {
+  const save = (data) => {
     const { cat, listing } = dialog;
     setSaving(true);
-    await new Promise((r) => setTimeout(r, 450)); // stands in for the API call
-    const { city, ...rest } = data;
-    setStore((s) => {
-      const list = s[cat];
-      const location = { ...(listing?.location ?? { state: "Sarawak", country: "Malaysia" }), city };
-      if (listing) {
-        return { ...s, [cat]: list.map((l) => (l.id === listing.id ? { ...l, ...rest, location, status: STATUS.PENDING } : l)) };
-      }
-      const id = list.reduce((m, l) => Math.max(m, l.id), 0) + 1;
-      return { ...s, [cat]: [...list, { id, vendorId: user.id, rating: 0, ...rest, location, status: STATUS.PENDING }] };
-    });
-    const ref = `REQ-${cat.slice(0, 3).toUpperCase()}-${Date.now().toString(36).toUpperCase().slice(-6)}`;
-    setNotice({ text: `“${data.name}” was ${listing ? "updated" : "added"} (reference ${ref}). It is pending administrator approval before tourists see the change.` });
-    setSaving(false);
-    setDialog(null);
+    try {
+      repository.submitListing(user, cat, listing?.id, data);
+      setNotice({ text: `“${data.name}” was submitted for administrator approval. Any previously approved version stays live until the new submission is approved.` });
+      setDialog(null);
+    } catch (error) { setNotice({ text: error.message, warn: true }); }
+    finally { setSaving(false); }
   };
 
-  const remove = (l) => {
-    if (!window.confirm(`Delete “${l.name}”? This cannot be undone.`)) return;
-    setStore((s) => ({ ...s, [tab]: s[tab].filter((x) => x.id !== l.id) }));
-    setNotice({ text: `“${l.name}” was deleted.`, warn: true });
+  const remove = (listing) => {
+    if (!window.confirm(`Delete “${listing.name}”? The published version will also be removed.`)) return;
+    try { repository.removeListing(user, tab, listing.id); setNotice({ text: `“${listing.name}” was deleted.`, warn: true }); }
+    catch (error) { setNotice({ text: error.message, warn: true }); }
   };
 
   const stats = [
     { label: "My listings", value: all.length },
-    { label: "Verified (live)", value: all.length - pending },
+    { label: "Published", value: all.filter((l) => publicationStatus(l, shared.providers) !== "Not published").length },
     { label: "Pending approval", value: pending, warn: true },
   ];
 
@@ -414,6 +399,8 @@ export default function VendorDashboard({ user, onLogout }) {
             </div>
           )}
 
+          <BusinessProfile key={user.id} provider={provider} user={user} repository={repository} onNotice={setNotice} />
+
           <div className="view" key={tab}>
             <section className="panel" aria-labelledby="tbl-title">
               <div className="head">
@@ -435,7 +422,7 @@ export default function VendorDashboard({ user, onLogout }) {
                       {rows.map((l, i) => (
                         <tr key={l.id} style={{ animationDelay: `${i * 40}ms` }}>
                           {cfg.columns.map(([h, get], k) => <td key={h} className={k === 0 ? "name" : undefined}>{get(l)}</td>)}
-                          <td><span className={`pill s-${l.status}`}>{STATUS_LABEL[l.status]}</span></td>
+                          <td><span className={`pill s-${l.status}`}>{STATUS_LABEL[l.status]}</span><small style={{ display: "block", marginTop: 6 }}>{publicationStatus(l, shared.providers)}</small>{l.decisionReason && <p style={{ color: "#a12626", maxWidth: 240 }}>{l.decisionReason}</p>}</td>
                           <td>
                             <button className="btn" aria-label={`Edit ${l.name}`} onClick={() => setDialog({ cat: tab, listing: l })}>Edit</button>
                             <button className="btn danger" aria-label={`Delete ${l.name}`} onClick={() => remove(l)}>Delete</button>
@@ -453,7 +440,7 @@ export default function VendorDashboard({ user, onLogout }) {
 
       {dialog && (
         <ListingDialog key={`${dialog.cat}-${dialog.listing?.id ?? "new"}`} cat={dialog.cat} listing={dialog.listing}
-          saving={saving} onSave={save} onClose={() => !saving && setDialog(null)} />
+          locations={shared.locations} saving={saving} onSave={save} onClose={() => !saving && setDialog(null)} />
       )}
     </>
   );

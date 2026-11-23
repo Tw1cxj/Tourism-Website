@@ -7,7 +7,11 @@ import TransportPage from "./TransportPage";
 import RestaurantPage from "./RestaurantPage";
 import BookingPage from "./BookingPage";
 import AdminDashboard from "./AdminDashboard";
+import VendorDashboard from "./VendorDashboard";
+import TravelInformation from "./TravelInformation";
 import { createUser, ROLES } from "./domain";
+import useTourismStore from "./useTourismStore";
+import { publishedCatalog } from "./tourismStore";
 
 // Only logged-in users with an allowed role can open the page
 function Guard({ user, allow, children }) {
@@ -26,6 +30,7 @@ function toDraft(kind, item) {
 
 export default function App() {
   const navigate = useNavigate();
+  const [tourism, repository] = useTourismStore();
 
   // Keep the user logged in when the page is refreshed
   const [user, setUser] = useState(() => {
@@ -38,10 +43,11 @@ export default function App() {
   });
 
   const handleLogin = (data) => {
-    const u = createUser(data.user);
-    sessionStorage.setItem("user", JSON.stringify(data.user));
+    const account = data.user.role === ROLES.USER ? repository.resolveDemoTourist(data.user) : data.user;
+    const u = createUser(account);
+    sessionStorage.setItem("user", JSON.stringify(account));
     setUser(u);
-    navigate(u.homePath(), { replace: true }); // admin -> /admin, others -> /home
+    navigate(u.homePath(), { replace: true }); // admin -> /admin, vendor -> /vendor, tourist -> /home
   };
 
   const handleLogout = () => {
@@ -53,18 +59,22 @@ export default function App() {
   const people = [ROLES.USER, ROLES.VENDOR]; // roles that use the normal site
   const home = () => navigate("/home");
   // Book button -> opens the booking page for that item
-  const book = (kind) => (item) => navigate("/booking", { state: { kind, draft: toDraft(kind, item) } });
+  const book = (kind) => (item) => { repository.recordActivity(user, "listing_view", { category: kind, listingId: item.id }); navigate("/booking", { state: { kind, draft: toDraft(kind, item) } }); };
 
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to={user.homePath()} replace /> : <AuthPages onLoggedIn={handleLogin} />} />
 
       <Route path="/home" element={<Guard user={user} allow={people}><LandingPage user={user} onLogout={handleLogout} /></Guard>} />
-      <Route path="/accommodation" element={<Guard user={user} allow={people}><SearchPage user={user} onLogout={handleLogout} onBack={home} onBook={book("accommodation")} /></Guard>} />
-      <Route path="/transportation" element={<Guard user={user} allow={people}><TransportPage user={user} onLogout={handleLogout} onBack={home} onBook={book("transport")} /></Guard>} />
-      <Route path="/restaurant" element={<Guard user={user} allow={people}><RestaurantPage user={user} onLogout={handleLogout} onBack={home} onBook={book("restaurant")} /></Guard>} />
+      <Route path="/accommodation" element={<Guard user={user} allow={people}><SearchPage accommodations={publishedCatalog(tourism, "accommodation")} user={user} onLogout={handleLogout} onBack={home} onBook={book("accommodation")} /></Guard>} />
+      <Route path="/transportation" element={<Guard user={user} allow={people}><TransportPage items={publishedCatalog(tourism, "transport")} user={user} onLogout={handleLogout} onBack={home} onBook={book("transport")} /></Guard>} />
+      <Route path="/restaurant" element={<Guard user={user} allow={people}><RestaurantPage items={publishedCatalog(tourism, "restaurant")} user={user} onLogout={handleLogout} onBack={home} onBook={book("restaurant")} /></Guard>} />
+
+      <Route path="/travel-information" element={<Guard user={user} allow={people}><TravelInformation user={user} onLogout={handleLogout} onBack={home} /></Guard>} />
 
       <Route path="/booking" element={<Guard user={user} allow={people}><BookingPage user={user} onLogout={handleLogout} /></Guard>} />
+
+      <Route path="/vendor" element={<Guard user={user} allow={[ROLES.VENDOR]}><VendorDashboard user={user} onLogout={handleLogout} /></Guard>} />
 
       <Route path="/admin" element={<Guard user={user} allow={[ROLES.ADMIN]}><AdminDashboard user={user} onLogout={handleLogout} /></Guard>} />
 
