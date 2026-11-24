@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import AuthPages from "./AuthPages";
 import LandingPage from "./LandingPage";
@@ -8,6 +8,8 @@ import RestaurantPage from "./RestaurantPage";
 import BookingPage from "./BookingPage";
 import ItineraryPage from "./ItineraryPage";
 import { useBookings } from "./Bookings";
+import useSavedEvents from "./useSavedEvents";
+import { loadSampleEvents } from "./Events";
 import AdminDashboard from "./AdminDashboard";
 import VendorDashboard from "./VendorDashboard";
 import TravelInformation from "./TravelInformation";
@@ -44,7 +46,11 @@ export default function App() {
     }
   });
 
-  const { bookings, addBooking, cancelBooking, savedEvents, toggleEvent } = useBookings(user);
+  const { bookings, addBooking, cancelBooking } = useBookings(user);
+  const { savedEvents, toggleEvent } = useSavedEvents(user);
+
+  // First run in a new browser: add the sample events to the shared repository
+  useEffect(() => { loadSampleEvents(repository); }, [repository]);
 
   const handleLogin = (data) => {
     const account = data.user.role === ROLES.USER ? repository.resolveDemoTourist(data.user) : data.user;
@@ -145,7 +151,7 @@ export default function App() {
 
       <Route path="/booking" element={<Guard user={user} allow={people}><BookingPage user={user} onLogout={handleLogout} onConfirm={addBooking} savedEvents={savedEvents} onToggleEvent={toggleEvent} /></Guard>} />
 
-      <Route path="/itinerary" element={<Guard user={user} allow={people}><ItineraryPage user={user} bookings={bookings} onCancel={cancelBooking} onBack={home} onBrowse={home} onLogout={handleLogout} savedEvents={savedEvents} onToggleEvent={toggleEvent} /></Guard>} />
+      <Route path="/itinerary" element={<Guard user={user} allow={people}><ItineraryPage user={user} bookings={bookings} onCancel={cancelBooking} onBack={home} onBrowse={home} onLogout={handleLogout} savedEvents={savedEvents} onToggleEvent={toggleEvent} onBookPlace={(kind, listing) => book(kind)(listing)} /></Guard>} />
 
       <Route path="/vendor" element={<Guard user={user} allow={[ROLES.VENDOR]}><VendorDashboard user={user} onLogout={handleLogout} /></Guard>} />
 

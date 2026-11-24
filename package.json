@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "test": "node --test tests/admin-workflow.test.mjs",
+    "test": "node --test tests/admin-workflow.test.mjs tests/itinerary.test.mjs",
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
