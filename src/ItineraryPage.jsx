@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { serviceCss, Hero } from "./ServiceShared";
 import { useLocation } from "react-router-dom";
-import { allEvents, todayISO, formatDate, relativeDay } from "./Bookings";
+import { todayISO, formatDate, relativeDay } from "./Bookings";
 import { EventRow, eventCss } from "./EventRow";
 import { eventsForStay, cityOf, itineraryEvents } from "./Events";
+import ItineraryPlanner, { plannerCss } from "./ItineraryPlanner";
 
 const KIND = {
   accommodation: { icon: "🏨", color: "#2a6df4", label: "Accommodation" },
@@ -145,10 +146,11 @@ function Calendar({ events, today, onToggleEvent }) {
 
 const when = (b) => (b.endDate ? `${formatDate(b.date)} → ${formatDate(b.endDate)}` : `${formatDate(b.date)} · ${b.time}`);
 
-export default function ItineraryPage({ user, bookings, onCancel, onBack, onBrowse, onLogout, savedEvents = [], onToggleEvent }) {
+export default function ItineraryPage({ user, bookings, onCancel, onBack, onBrowse, onLogout, savedEvents = [], onToggleEvent, onBookPlace }) {
   const { state } = useLocation();
   const justBooked = state?.justBooked; // set right after a booking is confirmed
-  const [view, setView] = useState("timeline");
+  // Open "My plans" by default; straight after a booking, show the timeline
+  const [view, setView] = useState(justBooked ? "timeline" : "plans");
   const [range, setRange] = useState("upcoming");
   const today = todayISO();
 
@@ -184,8 +186,8 @@ export default function ItineraryPage({ user, bookings, onCancel, onBack, onBrow
 
   return (
     <div style={{ "--g1": "#1d3a8a", "--g2": "#0e7c86", "--accent": "#2a6df4" }}>
-      <style>{serviceCss + css + eventCss}</style>
-      <Hero eyebrow="Your trip" title="My itinerary" lead="Your bookings and upcoming events in one place."
+      <style>{serviceCss + css + eventCss + plannerCss}</style>
+      <Hero eyebrow="Your trip" title="My itinerary" lead="Plan each day of your trip, and see your bookings and events in one place."
         user={user} onBack={onBack} onLogout={onLogout} />
 
       <main className="wrap">
@@ -202,6 +204,7 @@ export default function ItineraryPage({ user, bookings, onCancel, onBack, onBrow
         </section>
 
         <div className="chips" role="group" aria-label="View">
+          <button className="chip" aria-pressed={view === "plans"} onClick={() => setView("plans")}>My plans</button>
           <button className="chip" aria-pressed={view === "timeline"} onClick={() => setView("timeline")}>Timeline</button>
           <button className="chip" aria-pressed={view === "calendar"} onClick={() => setView("calendar")}>Calendar</button>
           <button className="chip" aria-pressed={view === "bookings"} onClick={() => setView("bookings")}>My bookings</button>
@@ -215,7 +218,9 @@ export default function ItineraryPage({ user, bookings, onCancel, onBack, onBrow
         </div>
 
         <div className="view" key={view + range}>
-          {bookings.length === 0 ? (
+          {view === "plans" ? (
+            <ItineraryPlanner user={user} savedEvents={savedEvents} onBookPlace={onBookPlace} />
+          ) : bookings.length === 0 && savedEvents.length === 0 ? (
             <div className="empty">
               <p>You have no bookings yet. Find a place to stay, a ride or a table.</p>
               <div className="acts"><button onClick={onBrowse}>Browse services</button></div>
