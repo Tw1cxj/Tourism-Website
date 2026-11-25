@@ -4,13 +4,14 @@
 
 export const PAYMENT_STATUS = { PENDING: "pending", PAID: "paid", FAILED: "failed", REFUNDED: "refunded", UNPAID: "unpaid" };
 
+// Two ways to pay: a card, or an e-wallet by scanning a QR code (the QR code is only a picture, see fakeQr.js)
 export const PAYMENT_METHODS = [
   { id: "card", label: "Credit / debit card", icon: "💳" },
-  { id: "fpx", label: "Online banking (FPX)", icon: "🏦" },
   { id: "ewallet", label: "E-wallet", icon: "📱" },
 ];
-export const BANKS = ["Maybank", "CIMB Bank", "Public Bank", "RHB Bank", "Hong Leong Bank"];
-export const WALLETS = ["Touch 'n Go eWallet", "GrabPay", "Boost", "ShopeePay"];
+export const WALLETS = ["Touch 'n Go eWallet", "GrabPay", "Boost", "ShopeePay"]; // shown as "scan with your e-wallet app"
+// Online banking was removed. Bookings that were paid that way before still need a name.
+const LEGACY_METHOD_LABELS = { fpx: "Online banking (FPX)" };
 
 // Fake payment gateway. A real one would call a bank or payment provider.
 // Test card: a card number ending in 0000 is declined, so the "payment failed" case can be tried.
@@ -37,16 +38,16 @@ function expiryError(text = "") {
 export class Payment {
   // Only the last 4 digits of a card are kept. The full number and the security code are never stored.
   constructor({ method, amount = 0, status = PAYMENT_STATUS.PENDING, detail = "", paidAt = null }) {
-    this.method = method; // "card" | "fpx" | "ewallet" | "venue" (pay at the restaurant)
+    this.method = method; // "card" | "ewallet" | "venue" (pay at the restaurant); old bookings may have "fpx"
     this.amount = amount;
     this.status = status;
-    this.detail = detail; // e.g. "ending 4242", "Maybank"
+    this.detail = detail; // e.g. "ending 4242", "QR code"
     this.paidAt = paidAt;
   }
 
   get methodLabel() {
     if (this.method === "venue") return "Pay at the venue";
-    return PAYMENT_METHODS.find((m) => m.id === this.method)?.label ?? this.method;
+    return PAYMENT_METHODS.find((m) => m.id === this.method)?.label ?? LEGACY_METHOD_LABELS[this.method] ?? this.method;
   }
   get summary() { return this.detail ? `${this.methodLabel} · ${this.detail}` : this.methodLabel; }
   get statusLabel() {
@@ -63,10 +64,8 @@ export class Payment {
       const expiry = expiryError(details.expiry);
       if (expiry) errors.expiry = expiry;
       if (!/^\d{3}$/.test(details.cvv ?? "")) errors.cvv = "Enter the 3-digit security code.";
-    } else if (method === "fpx") {
-      if (!details.bank) errors.bank = "Choose your bank.";
     } else if (method === "ewallet") {
-      if (!details.wallet) errors.wallet = "Choose your e-wallet.";
+      // Nothing to type: the customer scans the QR code with their e-wallet app
     } else {
       errors.method = "Choose a payment method.";
     }
@@ -79,8 +78,7 @@ export class Payment {
     this.status = result.ok ? PAYMENT_STATUS.PAID : PAYMENT_STATUS.FAILED;
     if (result.ok) {
       this.paidAt = new Date().toISOString();
-      this.detail = this.method === "card" ? `ending ${details.number.replace(/\s/g, "").slice(-4)}`
-        : this.method === "fpx" ? details.bank : details.wallet;
+      this.detail = this.method === "card" ? `ending ${details.number.replace(/\s/g, "").slice(-4)}` : "QR code";
     }
     return result;
   }

@@ -5,7 +5,9 @@ import { EventRow, eventCss } from "./EventRow";
 import { eventsForStay, eventsInArea, cityOf } from "./Events";
 import { todayISO, addDays, formatDate } from "./Bookings";
 import { BookingRequest, ticketedEventIds, eventPrice } from "./bookingDomain";
-import { Payment, PAYMENT_METHODS, BANKS, WALLETS } from "./payment";
+import { Payment, PAYMENT_METHODS, WALLETS } from "./payment";
+import FakeQrCode from "./FakeQrCode";
+import { makeQrSeed } from "./fakeQr";
 
 const KIND = {
   accommodation: { label: "Accommodation", accent: "#2a6df4", g1: "#1d3a8a", g2: "#2a6df4", back: "/accommodation", cta: "Confirm booking", icon: "🏨" },
@@ -31,6 +33,11 @@ const css = `
 .panel .method:hover{border-color:var(--accent)}
 .panel .method.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,white);font-weight:600}
 .panel .method:focus-within{outline:3px solid var(--accent);outline-offset:2px}
+.qrbox{display:flex;flex-direction:column;align-items:center;gap:8px;margin:4px 0 8px;padding:16px;border:1px dashed #c3cce0;border-radius:12px;background:#fff;text-align:center}
+.qrbox svg{width:min(210px,100%);height:auto;border:1px solid #e3e8f4;border-radius:8px;animation:rise .3s both}
+.qrbox b{font-size:1.02rem}
+.qrbox p{margin:0;font-size:.85rem;line-height:1.45;color:#5b6784}
+.qrbox .qrnew{width:auto;margin:0;padding:4px 8px;background:none;border:0;box-shadow:none;color:var(--accent);font:inherit;font-size:.85rem;font-weight:600;text-decoration:underline;cursor:pointer}
 .hint{font-size:.8rem;color:#5b6784;margin:16px 0 0}
 .sum{position:sticky;top:16px;background:linear-gradient(160deg,#14213d,#1d3a8a);color:#fff;animation-delay:.3s}
 .sum .item{display:flex;gap:12px;align-items:center;margin-bottom:18px}
@@ -73,7 +80,8 @@ export default function BookingPage({ user, onLogout, onConfirm, bookings = [], 
     time: kind === "event" ? (item?.time ?? "") : kind === "restaurant" ? "19:00" : "09:00", people: 1,
   });
   const [method, setMethod] = useState("card");
-  const [pay, setPay] = useState({ name: "", number: "", expiry: "", cvv: "", bank: "", wallet: "" });
+  const [pay, setPay] = useState({ name: "", number: "", expiry: "", cvv: "" });
+  const [qrSeed, setQrSeed] = useState(makeQrSeed); // the fake QR code shown for e-wallet; a click makes a new one
   const [tried, setTried] = useState(false); // payment errors are shown after the first Confirm click
   const [paying, setPaying] = useState(false);
   const [payFailed, setPayFailed] = useState("");
@@ -205,7 +213,7 @@ export default function BookingPage({ user, onLogout, onConfirm, bookings = [], 
                     <legend>Payment method</legend>
                     {PAYMENT_METHODS.map((m) => (
                       <label key={m.id} className={`method ${method === m.id ? "on" : ""}`}>
-                        <input type="radio" name="method" value={m.id} checked={method === m.id} onChange={() => setMethod(m.id)} />
+                        <input type="radio" name="method" value={m.id} checked={method === m.id} onChange={() => { setMethod(m.id); if (m.id === "ewallet") setQrSeed(makeQrSeed()); }} />
                         <span aria-hidden="true">{m.icon}</span>{m.label}
                       </label>
                     ))}
@@ -233,27 +241,15 @@ export default function BookingPage({ user, onLogout, onConfirm, bookings = [], 
                       </div>
                     </>
                   )}
-                  {method === "fpx" && (
-                    <>
-                      <label htmlFor="bank">Choose your bank</label>
-                      <select id="bank" name="bank" value={pay.bank} onChange={setPayField}>
-                        <option value="">Select a bank</option>
-                        {BANKS.map((b) => <option key={b}>{b}</option>)}
-                      </select>
-                      {showPay.bank && <p className="fe">{showPay.bank}</p>}
-                    </>
-                  )}
                   {method === "ewallet" && (
-                    <>
-                      <label htmlFor="wallet">Choose your e-wallet</label>
-                      <select id="wallet" name="wallet" value={pay.wallet} onChange={setPayField}>
-                        <option value="">Select an e-wallet</option>
-                        {WALLETS.map((w) => <option key={w}>{w}</option>)}
-                      </select>
-                      {showPay.wallet && <p className="fe">{showPay.wallet}</p>}
-                    </>
+                    <div className="qrbox">
+                      <FakeQrCode seed={qrSeed} />
+                      <b>Scan to pay RM{total}</b>
+                      <p>Open your e-wallet app ({WALLETS.join(", ")}) and scan this code.</p>
+                      <button type="button" className="qrnew" onClick={() => setQrSeed(makeQrSeed())}>Generate a new code</button>
+                    </div>
                   )}
-                  <p className="hint">Demo only. No real payment is taken{method === "card" ? ", and your card details are not saved. A card number ending in 0000 is declined, so you can try a failed payment." : "."}</p>
+                  <p className="hint">Demo only. No real payment is taken{method === "card" ? ", and your card details are not saved. A card number ending in 0000 is declined, so you can try a failed payment." : ". This QR code is just a picture and cannot be scanned. Press the Pay button to finish the demo payment."}</p>
                 </section>
               )}
             </fieldset>
