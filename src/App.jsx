@@ -62,6 +62,7 @@ function ReviewRoute({ tourism, repository, user, onBack, onLogout }) {
       });
     });
   return <ReviewPage kind={kind} item={item} reviews={published} onSubmit={submitReview} user={user} onBack={() => onBack(REVIEW_BACK[kind])} onLogout={onLogout} />;
+}
 
 export default function App() {
   const navigate = useNavigate();
@@ -230,8 +231,6 @@ export default function App() {
     </Guard>
   } 
 />
-
-      <Route path="/booking" element={<Guard user={user} allow={people}><BookingPage user={user} onLogout={handleLogout} onConfirm={addBooking} savedEvents={savedEvents} onToggleEvent={toggleEvent} /></Guard>} />
 
       <Route path="/booking" element={<Guard user={user} allow={people}><BookingPage user={user} onLogout={handleLogout} onConfirm={confirmBooking} bookings={bookings} savedEvents={savedEvents} onToggleEvent={toggleEvent} /></Guard>} />
 
