@@ -17,6 +17,37 @@ function setup() {
 }
 function latest(repo, category = 'accommodation') { return repo.getSnapshot().listings[category].at(-1); }
 
+test('visitor information can be trashed and restored without losing content', () => {
+  const { repo, storage } = setup();
+  const article = {title:'Recovery guide',description:'Useful visitor details.',kind:'guide',status:'published',translations:{ms:{title:'Panduan',description:'Maklumat'}}};
+  repo.saveInformation(admin,null,article);
+  const id=repo.getSnapshot().information.at(-1).id;
+  assert.throws(()=>repo.trashInformation(vendor,id));
+  repo.trashInformation(admin,id);
+  assert.ok(!visibleInformation(repo.getSnapshot().information).some((item)=>item.id===id));
+  assert.throws(()=>repo.saveInformation(admin,id,article),/Restore/);
+  const reloaded=new TourismRepository(storage);
+  assert.equal(reloaded.getSnapshot().information.find((item)=>item.id===id).status,'trashed');
+  assert.throws(()=>reloaded.restoreInformation(vendor,id));
+  reloaded.restoreInformation(admin,id);
+  const restored=reloaded.getSnapshot().information.find((item)=>item.id===id);
+  assert.equal(restored.status,'draft');
+  assert.equal(restored.description,article.description);
+  assert.deepEqual(restored.translations,article.translations);
+  assert.ok(!visibleInformation(reloaded.getSnapshot().information).some((item)=>item.id===id));
+  reloaded.saveInformation(admin,id,{...restored,status:'published'});
+  assert.ok(visibleInformation(reloaded.getSnapshot().information).some((item)=>item.id===id));
+});
+
+test('unfinished articles can be saved as drafts but need a body to publish', () => {
+  const {repo}=setup();
+  repo.saveInformation(admin,null,{title:'Work in progress',kind:'guide',status:'draft'});
+  const article=repo.getSnapshot().information.at(-1);
+  assert.equal(article.description,'');
+  assert.throws(()=>repo.saveInformation(admin,article.id,{...article,status:'published'}),(error)=>!!error.fieldErrors.description);
+  assert.equal(repo.getSnapshot().information.find((item)=>item.id===article.id).status,'draft');
+});
+
 test('new listing is hidden, approval publishes it, and decisions survive reload', () => {
   const { repo, storage } = setup();
   repo.submitListing(vendor,'accommodation',null,fields);

@@ -40,3 +40,13 @@ Published alerts require a start/end window and recommended action, with severit
 System administrators and Management also have read-only booking oversight. The existing booking form remains untouched and still needs to save shared records. See booking-integration.md for the data contract. There are no admin acceptance, cancellation or refund controls.
 
 Verification for this enhancement: 23 workflow tests and the production build pass, alongside full-article/admin-booking rendering checks. No interactive visual browser check was performed.
+
+## Simplified visitor information workflow
+
+The editor starts with title, information type, short summary, main article and location (All Sarawak by default). Alert fields appear only for alerts. Images, sources and review dates, translations and additional travel details are grouped into collapsed optional sections. Save draft allows an unfinished article; Publish checks required content. Field errors retain entered text and link to the affected fields. Preview uses the visitor article component and supports language selection.
+
+Move to trash asks for confirmation, hides the article from visitor lists and direct article URLs, and retains its content in storage. Select Trash in the admin status filter and use Restore as draft to recover an article. It stays hidden until published again. Existing information permissions also protect these actions, and changes appear in the activity history.
+
+The visitor page keeps search, information type and language visible. More filters expands topic, division and town; card summaries are shortened visually while full articles remain available. Existing navy and blue colours are retained.
+
+Verification: all 40 automated tests pass, production build succeeds, and server rendering checks cover the simplified guide/alert editors, article visibility after deletion and existing routes. Interactive browser and assistive-technology testing have not been performed. Storage remains local to the browser prototype; this does not introduce a server database or synchronisation across devices.

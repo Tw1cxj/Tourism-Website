@@ -1,4 +1,4 @@
-import { TRAVEL_TOPICS, safeWebUrl } from './travelContent.js';
+import { informationErrors } from './travelContent.js';
 
 export const STAFF_AREAS = {
   content: ['overview','providers','listings','events','locations','reviews','enquiries','information'],
@@ -94,28 +94,37 @@ export class GovernanceOperations {
   }
   saveInformation(actor,id,fields) {
     this.requireCapability(actor,'information');
-    const record={title:required(fields.title,'Title',150),description:required(fields.description,'Information',12000),kind:fields.kind,status:fields.status,locationId:fields.locationId ? Number(fields.locationId):null,translations:fields.translations ?? {}};
+    const errors = informationErrors(fields, fields.status, Date.parse(this.clock()));
+    if (Object.keys(errors).length) throw Object.assign(new Error(Object.values(errors)[0]), { fieldErrors: errors });
+    const record={title:clean(fields.title),description:clean(fields.description),kind:fields.kind,status:fields.status,locationId:fields.locationId ? Number(fields.locationId):null,translations:fields.translations ?? {}};
     for(const field of ['summary','imageUrl','imageAlt','sourceUrl','sourceLabel','lastChecked','reviewDue','alertStart','alertEnd','recommendedAction','gettingAround','culturalHighlights','accessibility','travelTips']) record[field]=clean(fields[field]);
     record.topic=fields.topic || 'general'; record.severity=fields.severity || 'info';
-    if(!Object.hasOwn(TRAVEL_TOPICS,record.topic)) throw new Error('Choose a valid travel topic.');
-    if(record.summary.length>400) throw new Error('Keep the article summary within 400 characters.');
-    for(const field of ['imageUrl','sourceUrl']) if(record[field]&&!safeWebUrl(record[field])) throw new Error('Image and source links must be valid HTTP or HTTPS addresses.');
-    if(record.imageUrl&&!record.imageAlt) throw new Error('Describe the image for visitors using screen readers.');
-    for(const field of ['lastChecked','reviewDue']) if(record[field]&&!validDate(record[field])) throw new Error('Enter valid content-check and review dates.');
-    if(record.lastChecked>this.clock().slice(0,10)) throw new Error('The last-checked date cannot be in the future.');
-    if(record.lastChecked&&record.reviewDue&&record.reviewDue<record.lastChecked) throw new Error('Review due must be on or after the last-checked date.');
-    if(record.kind==='alert') {
-      if(!['info','warning','critical'].includes(record.severity)) throw new Error('Choose an alert severity.');
-      if(record.status==='published'&&(!record.alertStart||!record.alertEnd||!record.recommendedAction)) throw new Error('Published alerts need a start, an end and recommended action.');
-      if((record.alertStart&&!Number.isFinite(Date.parse(record.alertStart)))||(record.alertEnd&&!Number.isFinite(Date.parse(record.alertEnd)))||(record.alertStart&&record.alertEnd&&Date.parse(record.alertEnd)<=Date.parse(record.alertStart))) throw new Error('Alert end must be after its start.');
-    }
-    if(!['guide','essential','alert'].includes(record.kind) || !['draft','published','archived'].includes(record.status)) throw new Error('Choose a valid information type and status.');
     this.update(actor,`${id?'Updated':'Created'} visitor information: ${record.title}`,(state)=>{
       if(record.locationId && !state.locations.some((l)=>l.id===record.locationId)) throw new Error('Location not found.');
       const index=state.information.findIndex((a)=>a.id===id);
       if(id!=null && index<0) throw new Error('Information not found.');
-      const saved={...record,id:id ?? nextId(state.information),updatedAt:this.clock()};
+      if(index>=0 && state.information[index].status==='trashed') throw new Error('Restore this article from Trash before editing it.');
+      const saved={...(index>=0 ? state.information[index] : {}),...record,id:id ?? nextId(state.information),updatedAt:this.clock()};
       if(index<0) state.information.push(saved); else state.information[index]=saved;
+    });
+  }
+  trashInformation(actor,id) {
+    this.requireCapability(actor,'information');
+    this.update(actor,`Moved visitor information ${id} to trash`,(state)=>{
+      const article=state.information.find((a)=>a.id===id);
+      if(!article) throw new Error('Information not found.');
+      if(article.status==='trashed') throw new Error('This article is already in Trash.');
+      article.previousStatus=article.status;
+      article.status='trashed'; article.trashedAt=this.clock(); article.trashedBy=actor.id;
+    });
+  }
+  restoreInformation(actor,id) {
+    this.requireCapability(actor,'information');
+    this.update(actor,`Restored visitor information ${id} as draft`,(state)=>{
+      const article=state.information.find((a)=>a.id===id && a.status==='trashed');
+      if(!article) throw new Error('Article not found in Trash.');
+      article.status='draft'; article.restoredAt=this.clock();
+      delete article.trashedAt; delete article.trashedBy;
     });
   }
   requireTourist(actor) { if(actor?.role!=='user') throw new Error('Sign in as a tourist to use this action.'); }
