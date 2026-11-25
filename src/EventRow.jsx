@@ -18,13 +18,19 @@ export const eventCss = `
 .er-add{border:1px solid #7c3aed;background:#fff;color:#6d28d9;border-radius:99px;padding:7px 14px;font:inherit;font-size:.82rem;font-weight:700;cursor:pointer;white-space:nowrap;transition:background .2s,color .2s,transform .2s}
 .er-add:hover{transform:translateY(-1px);background:#ede9fe}
 .er-add[aria-pressed=true]{background:#7c3aed;color:#fff}
+.er-add:disabled{cursor:default;transform:none}
 .er-add:focus-visible{outline:3px solid #7c3aed;outline-offset:2px}
 @media(max-width:640px){.er{flex-wrap:wrap}.er-price{margin-left:0}}
 `;
 
-// One concert / festival / cultural event
-export function EventRow({ event, saved, onToggle, note, delay = 0 }) {
+// One concert / festival / cultural event.
+// sellTickets: an event with a price is bought, not just added. Then `saved` means "ticket bought",
+// the button says "Buy ticket" and calls onBuy (the ticket checkout) instead of onToggle.
+export function EventRow({ event, saved, onToggle, onBuy, note, delay = 0, sellTickets = false }) {
   const look = EVENT_LOOK[event.type] ?? EVENT_LOOK.Concert;
+  const buy = sellTickets && event.ticketPrice > 0;
+  const label = buy ? (saved ? "Ticket booked ✓" : "Buy ticket") : saved ? "Added ✓" : "+ Add";
+  const action = buy ? onBuy : onToggle;
   return (
     <div className="er" style={{ animationDelay: `${delay}ms` }}>
       <span className="eico" style={{ background: `color-mix(in srgb, ${look.color} 16%, white)` }} aria-hidden="true">{look.icon}</span>
@@ -34,8 +40,8 @@ export function EventRow({ event, saved, onToggle, note, delay = 0 }) {
         {note && <span className="er-tag">{note}</span>}
       </span>
       <span className="er-price">{event.price}</span>
-      {onToggle && (
-        <button type="button" className="er-add" aria-pressed={!!saved} onClick={() => onToggle(event.id)}>{saved ? "Added ✓" : "+ Add"}</button>
+      {action && (
+        <button type="button" className="er-add" aria-pressed={!!saved} disabled={buy && saved} onClick={() => action(event.id)}>{label}</button>
       )}
     </div>
   );

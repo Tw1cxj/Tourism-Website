@@ -12,6 +12,7 @@ export default function TravelInformation({user,onLogout,onBack}) {
   const [state]=useTourismStore(),[params,setParams]=useSearchParams();
   const [query,setQuery]=useState(''),[kind,setKind]=useState('all'),[language,setLanguage]=useState('en');
   const [topic,setTopic]=useState('all'),[division,setDivision]=useState('all'),[town,setTown]=useState('all');
+  const [moreFilters,setMoreFilters]=useState(false);
   const visible=visibleInformation(state.information);
   const selected=params.has('article')?visible.find((item)=>String(item.id)===params.get('article')):null;
   const divisions=[...new Set(state.locations.map((l)=>l.division))].sort();
@@ -29,10 +30,13 @@ export default function TravelInformation({user,onLogout,onBack}) {
       <section className="filters" aria-label="Travel information filters">
         <div className="travel-search"><label htmlFor="travel-query">Search information</label><input id="travel-query" type="search" value={query} onChange={(e)=>setQuery(e.target.value)} placeholder="Search a topic, town or division"/></div>
         <div><label htmlFor="travel-kind">Information type</label><select id="travel-kind" value={kind} onChange={(e)=>setKind(e.target.value)}><option value="all">All information</option>{Object.entries(TYPES).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></div>
+        <div><label htmlFor="travel-language">Content language</label><select id="travel-language" value={language} onChange={(e)=>setLanguage(e.target.value)}><option value="en">English</option><option value="ms">Bahasa Melayu</option><option value="zh">简体中文</option></select></div>
+        <div className="more-filters-toggle"><button type="button" className="read-article" aria-expanded={moreFilters} aria-controls="travel-more-filters" onClick={()=>setMoreFilters(!moreFilters)}>{moreFilters?'Fewer filters':'More filters'}{(topic!=='all'||division!=='all'||town!=='all')?' (active)':''}</button></div>
+        <div id="travel-more-filters" className="travel-more-filters" hidden={!moreFilters}>
         <div><label htmlFor="travel-topic">Topic</label><select id="travel-topic" value={topic} onChange={(e)=>setTopic(e.target.value)}><option value="all">All topics</option>{Object.entries(TRAVEL_TOPICS).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></div>
         <div><label htmlFor="travel-division">Division</label><select id="travel-division" value={division} onChange={(e)=>{setDivision(e.target.value);setTown('all');}}><option value="all">All divisions</option>{divisions.map((value)=><option key={value}>{value}</option>)}</select></div>
         <div><label htmlFor="travel-town">Town</label><select id="travel-town" value={town} onChange={(e)=>setTown(e.target.value)}><option value="all">All towns</option>{towns.map((value)=><option key={value}>{value}</option>)}</select></div>
-        <div><label htmlFor="travel-language">Content language</label><select id="travel-language" value={language} onChange={(e)=>setLanguage(e.target.value)}><option value="en">English</option><option value="ms">Bahasa Melayu</option><option value="zh">简体中文</option></select></div>
+        </div>
       </section>
       <p className="language-note">English is shown when a translation is unavailable. Information applying across Sarawak stays visible in location searches.</p>
       {alerts.length>0&&<section className="active-alerts" aria-label="Active travel alerts"><h2>Active travel alerts</h2>{alerts.map((item)=><div className={`travel-alert severity-${item.severity??'info'}`} key={item.id}><div><strong>{localised(item,'title',language)}</strong><p>{item.recommendedAction||articleSummary(item,language)}</p></div><button className="read-article" onClick={()=>open(item.id)}>Read alert</button></div>)}</section>}

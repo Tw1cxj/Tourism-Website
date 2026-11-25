@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { Payment } from "./payment.js";
+import { recordBooking, recordCancellation } from "./bookingRecords.js";
 
 
 export const todayISO = () => new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD
@@ -7,14 +9,18 @@ export const nightsBetween = (a, b) => Math.round((new Date(b + "T00:00:00") - n
 export const formatDate = (iso) => new Date(iso + "T00:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
 
 export class Booking {
-  // kind: "accommodation" | "transport" | "restaurant"
-  constructor({ id, userId, kind, itemId, itemName, place = "", date, endDate = "", time = "", people = 1, total = 0, status = "confirmed", createdAt = "" }) {
-    Object.assign(this, { id, userId, kind, itemId, itemName, place, date, endDate, time, people, total, status, createdAt });
+  // kind: "accommodation" | "transport" | "restaurant" | "event" (tickets bought for one event)
+  constructor({ id, userId, kind, itemId, itemName, place = "", date, endDate = "", time = "", people = 1, total = 0, status = "confirmed", createdAt = "", reference = "", tickets = [], payment = null }) {
+    Object.assign(this, { id, userId, kind, itemId, itemName, place, date, endDate, time, people, total, status, createdAt, reference, tickets }); // tickets: event tickets bought with a stay
+    // The payment made for this booking (see payment.js). Older bookings have none.
+    this.payment = payment && !(payment instanceof Payment) ? new Payment(payment) : payment;
   }
   get lastDate() { return this.endDate || this.date; }
   get isPast() { return this.lastDate < todayISO(); }
   // The calendar events this booking creates
   get events() {
+    // A ticket booking adds nothing here: its event is already in the calendar as a saved event (see Events.js)
+    if (this.kind === "event") return [];
     const base = { bookingId: this.id, kind: this.kind };
     if (this.kind === "accommodation") {
       return [
@@ -68,8 +74,9 @@ function load(user) {
   }
 }
 
-// Swap the localStorage calls for API calls when your backend is ready
-export function useBookings(user) {
+// Swap the localStorage calls for API calls when your backend is ready.
+// Pass the shared repository as well and every booking is copied into it, so the admin Bookings tab can see it.
+export function useBookings(user, repository) {
   const [bookings, setBookings] = useState(() => load(user));
 
   const [savedEvents, setSavedEvents] = useState(() => loadEvents(user));
@@ -87,10 +94,18 @@ export function useBookings(user) {
   const addBooking = (data) => {
     const booking = new Booking({ ...data, id: Date.now().toString(36), userId: user?.id, status: "confirmed", createdAt: new Date().toISOString() });
     save([...bookings, booking]);
+    recordBooking(repository, user, booking);
     return booking;
   };
 
-  const cancelBooking = (id) => save(bookings.map((b) => (b.id === id ? new Booking({ ...b, status: "cancelled" }) : b)));
+  // Cancelling gives the money back when the booking was paid
+  const cancelBooking = (id) => {
+    const found = bookings.find((b) => b.id === id);
+    if (!found) return;
+    const cancelled = new Booking({ ...found, status: "cancelled", payment: found.payment?.refunded() ?? null });
+    save(bookings.map((b) => (b.id === id ? cancelled : b)));
+    recordCancellation(repository, user, cancelled);
+  };
 
   // Add or remove a concert / festival from the itinerary
   const toggleEvent = (id) => {

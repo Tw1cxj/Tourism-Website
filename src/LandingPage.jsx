@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { formatDate, relativeDay } from "./Bookings";
 import { EventRow, eventCss } from "./EventRow";
 import { upcomingItinerary, nextEvents } from "./Events";
+import { ticketedEventIds } from "./bookingDomain";
 
 const css = `
 *{box-sizing:border-box}
@@ -84,9 +85,10 @@ const SERVICES = [
     icon: <svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4zM8 9h8M8 12.5h5" /></svg> },
 ];
 
-export default function LandingPage({ user, onLogout, bookings = [], onItinerary, savedEvents = [], onToggleEvent }) {
+export default function LandingPage({ user, onLogout, bookings = [], onItinerary, savedEvents = [], onToggleEvent, onBuyEvent }) {
   const upcoming = upcomingItinerary(bookings, savedEvents);
   const whatsOn = nextEvents(4);
+  const ticketed = ticketedEventIds(bookings); // events with a paid ticket
   const next = upcoming[0];
   return (
     <>
@@ -152,7 +154,7 @@ export default function LandingPage({ user, onLogout, bookings = [], onItinerary
         <section className="upc" aria-label="What's on in Sarawak" style={{ marginTop: -24 }}>
           <div className="upc-head"><h2>🎶 What's on in Sarawak</h2></div>
           {whatsOn.map((e, i) => (
-            <EventRow key={e.id} event={e} delay={i * 70} saved={savedEvents.includes(e.id)} onToggle={onToggleEvent} />
+            <EventRow key={e.id} event={e} delay={i * 70} sellTickets saved={e.ticketPrice > 0 ? ticketed.has(e.id) : savedEvents.includes(e.id)} onToggle={onToggleEvent} onBuy={onBuyEvent} />
           ))}
         </section>
       </div>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import AuthPages from "./AuthPages";
 import LandingPage from "./LandingPage";
@@ -10,6 +10,9 @@ import RestaurantPage from "./RestaurantPage";
 import BookingPage from "./BookingPage";
 import ItineraryPage from "./ItineraryPage";
 import { useBookings } from "./Bookings";
+import useSavedEvents from "./useSavedEvents";
+import { loadSampleEvents, listEvents } from "./Events";
+import { ticketedEventIds } from "./bookingDomain";
 import AdminDashboard from "./AdminDashboard";
 import VendorDashboard from "./VendorDashboard";
 import TravelInformation from "./TravelInformation";
@@ -30,6 +33,11 @@ function toDraft(kind, item) {
   if (kind === "accommodation") return { itemId: item.id, name: item.name, place, unitPrice: item.pricePerNight, unit: "night", max: item.maxGuests };
   if (kind === "transport") return { itemId: item.id, name: item.name, place, unitPrice: item.price, unit: item.priceUnit, max: item.capacity };
   return { itemId: item.id, name: item.name, place, priceLabel: item.priceLabel, max: 12 };
+}
+
+// What the booking page needs to know about an event whose tickets are being bought
+function toEventDraft(event) {
+  return { itemId: event.id, name: event.title, place: event.venue, unitPrice: event.ticketPrice, unit: "ticket", max: 10, date: event.date, time: event.time, lastDate: event.endDate };
 }
 
 const REVIEW_BACK = { accommodation: "/accommodation", transport: "/transportation", restaurant: "/restaurant" };
@@ -54,7 +62,6 @@ function ReviewRoute({ tourism, repository, user, onBack, onLogout }) {
       });
     });
   return <ReviewPage kind={kind} item={item} reviews={published} onSubmit={submitReview} user={user} onBack={() => onBack(REVIEW_BACK[kind])} onLogout={onLogout} />;
-}
 
 export default function App() {
   const navigate = useNavigate();
@@ -70,7 +77,11 @@ export default function App() {
     }
   });
 
-  const { bookings, addBooking, cancelBooking, savedEvents, toggleEvent } = useBookings(user);
+  const { bookings, addBooking, cancelBooking } = useBookings(user, repository);
+  const { savedEvents, toggleEvent } = useSavedEvents(user);
+
+  // First run in a new browser: add the sample events to the shared repository
+  useEffect(() => { loadSampleEvents(repository); }, [repository]);
 
   const handleLogin = (data) => {
     const account = data.user.role === ROLES.USER ? repository.resolveDemoTourist(data.user) : data.user;
@@ -84,6 +95,33 @@ export default function App() {
     sessionStorage.removeItem("user");
     setUser(null);
     navigate("/login", { replace: true });
+  };
+
+  // Events with a price are bought, not just added. The buy button opens the ticket checkout (BookingPage, kind "event").
+  const ticketed = ticketedEventIds(bookings);
+  const buyEvent = (id) => {
+    const event = listEvents(tourism).find((e) => e.id === id && e.isPublished);
+    if (!event) { window.alert("This event is no longer available."); return; }
+    navigate("/booking", { state: { kind: "event", draft: toEventDraft(event) } });
+  };
+  // Remove / add a free event. An event with a ticket stays until the booking is cancelled (which refunds it).
+  const toggleSavedEvent = toggleEvent && ((id) => {
+    if (savedEvents.includes(id) && ticketed.has(id)) { window.alert("You already have a ticket for this event. Cancel that booking in My bookings to remove it (the ticket is refunded)."); return; }
+    toggleEvent(id);
+  });
+  // After the payment goes through: keep the booking, and put a ticket-only event in the calendar
+  const confirmBooking = (data) => {
+    const booking = addBooking(data);
+    if (data.kind === "event") {
+      try { repository.saveEventForTourist(user, data.itemId, false); } catch { /* the ticket is bought; only the calendar entry is missing */ }
+    }
+    return booking;
+  };
+  // Cancelling a ticket-only booking also takes the event out of the calendar
+  const cancelAndRelease = (id) => {
+    const found = bookings.find((b) => b.id === id);
+    cancelBooking(id);
+    if (found?.kind === "event" && savedEvents.includes(found.itemId)) toggleEvent?.(found.itemId);
   };
 
   const people = [ROLES.USER, ROLES.VENDOR]; // roles that use the normal site
@@ -107,7 +145,8 @@ export default function App() {
         bookings={bookings}
         onItinerary={() => navigate("/itinerary")}
         savedEvents={savedEvents}
-        onToggleEvent={toggleEvent}
+        onToggleEvent={toggleSavedEvent}
+        onBuyEvent={toggleEvent && buyEvent}
       />
     </Guard>
   }
@@ -194,7 +233,9 @@ export default function App() {
 
       <Route path="/booking" element={<Guard user={user} allow={people}><BookingPage user={user} onLogout={handleLogout} onConfirm={addBooking} savedEvents={savedEvents} onToggleEvent={toggleEvent} /></Guard>} />
 
-      <Route path="/itinerary" element={<Guard user={user} allow={people}><ItineraryPage user={user} bookings={bookings} onCancel={cancelBooking} onBack={home} onBrowse={home} onLogout={handleLogout} savedEvents={savedEvents} onToggleEvent={toggleEvent} /></Guard>} />
+      <Route path="/booking" element={<Guard user={user} allow={people}><BookingPage user={user} onLogout={handleLogout} onConfirm={confirmBooking} bookings={bookings} savedEvents={savedEvents} onToggleEvent={toggleEvent} /></Guard>} />
+
+      <Route path="/itinerary" element={<Guard user={user} allow={people}><ItineraryPage user={user} bookings={bookings} onCancel={cancelAndRelease} onBack={home} onBrowse={home} onLogout={handleLogout} savedEvents={savedEvents} onToggleEvent={toggleSavedEvent} onBuyEvent={toggleEvent && buyEvent} onBookPlace={(kind, listing) => book(kind)(listing)} /></Guard>} />
 
       <Route path="/vendor" element={<Guard user={user} allow={[ROLES.VENDOR]}><VendorDashboard user={user} onLogout={handleLogout} /></Guard>} />
 

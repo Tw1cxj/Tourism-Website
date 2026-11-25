@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { serviceCss, Hero } from "./ServiceShared";
 import { useLocation } from "react-router-dom";
-import { allEvents, todayISO, formatDate, relativeDay } from "./Bookings";
+import { todayISO, formatDate, relativeDay } from "./Bookings";
 import { EventRow, eventCss } from "./EventRow";
 import { eventsForStay, cityOf, itineraryEvents } from "./Events";
+import ItineraryPlanner, { plannerCss } from "./ItineraryPlanner";
 
 const KIND = {
   accommodation: { icon: "🏨", color: "#2a6df4", label: "Accommodation" },
@@ -34,6 +35,8 @@ const css = `
 .bcard.cancelled{opacity:.55}
 .bcard .main{flex:1;min-width:0}.bcard h3{margin:0 0 2px;font-size:1.05rem}.bcard p{margin:0;color:#5b6784;font-size:.9rem}
 .bcard .right{text-align:right}.bcard .amt{font-weight:700;font-size:1.1rem}
+.bcard .ref{font-size:.78rem;color:var(--accent);font-weight:600;letter-spacing:.03em;margin-top:2px}
+.bcard .paid{display:block;color:#5b6784;font-size:.8rem;margin-top:4px}
 .pill{display:inline-block;padding:3px 10px;border-radius:99px;font-size:.75rem;font-weight:700;margin-top:6px}
 .p-confirmed{background:#dcfce7;color:#166534}.p-cancelled{background:#fee2e2;color:#991b1b}.p-past{background:#e4e9f4;color:#42506f}
 .cancel{margin-top:8px;border:1px solid #f3c6c3;background:#fff;color:#b3261e;padding:6px 12px;border-radius:8px;font:inherit;font-size:.82rem;cursor:pointer;transition:background .2s,color .2s}
@@ -145,10 +148,12 @@ function Calendar({ events, today, onToggleEvent }) {
 
 const when = (b) => (b.endDate ? `${formatDate(b.date)} → ${formatDate(b.endDate)}` : `${formatDate(b.date)} · ${b.time}`);
 
-export default function ItineraryPage({ user, bookings, onCancel, onBack, onBrowse, onLogout, savedEvents = [], onToggleEvent }) {
+export default function ItineraryPage({ user, bookings, onCancel, onBack, onBrowse, onLogout, savedEvents = [], onToggleEvent, onBuyEvent, onBookPlace }) {
   const { state } = useLocation();
   const justBooked = state?.justBooked; // set right after a booking is confirmed
-  const [view, setView] = useState("timeline");
+  const justRef = bookings.find((b) => b.id === justBooked)?.reference;
+  // Open "My plans" by default; straight after a booking, show the timeline
+  const [view, setView] = useState(justBooked ? "timeline" : "plans");
   const [range, setRange] = useState("upcoming");
   const today = todayISO();
 
@@ -184,15 +189,15 @@ export default function ItineraryPage({ user, bookings, onCancel, onBack, onBrow
 
   return (
     <div style={{ "--g1": "#1d3a8a", "--g2": "#0e7c86", "--accent": "#2a6df4" }}>
-      <style>{serviceCss + css + eventCss}</style>
-      <Hero eyebrow="Your trip" title="My itinerary" lead="Your bookings and upcoming events in one place."
+      <style>{serviceCss + css + eventCss + plannerCss}</style>
+      <Hero eyebrow="Your trip" title="My itinerary" lead="Plan each day of your trip, and see your bookings and events in one place."
         user={user} onBack={onBack} onLogout={onLogout} />
 
       <main className="wrap">
         {justBooked && (
           <div className="okbar" role="status">
             <svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" /></svg>
-            Booking confirmed. It is now in your itinerary.
+            Booking confirmed{justRef && ` (${justRef})`}. It is now in your itinerary.
           </div>
         )}
         <section className="stats" aria-label="Summary">
@@ -202,6 +207,7 @@ export default function ItineraryPage({ user, bookings, onCancel, onBack, onBrow
         </section>
 
         <div className="chips" role="group" aria-label="View">
+          <button className="chip" aria-pressed={view === "plans"} onClick={() => setView("plans")}>My plans</button>
           <button className="chip" aria-pressed={view === "timeline"} onClick={() => setView("timeline")}>Timeline</button>
           <button className="chip" aria-pressed={view === "calendar"} onClick={() => setView("calendar")}>Calendar</button>
           <button className="chip" aria-pressed={view === "bookings"} onClick={() => setView("bookings")}>My bookings</button>
@@ -215,7 +221,9 @@ export default function ItineraryPage({ user, bookings, onCancel, onBack, onBrow
         </div>
 
         <div className="view" key={view + range}>
-          {bookings.length === 0 ? (
+          {view === "plans" ? (
+            <ItineraryPlanner user={user} savedEvents={savedEvents} onBookPlace={onBookPlace} />
+          ) : bookings.length === 0 && savedEvents.length === 0 ? (
             <div className="empty">
               <p>You have no bookings yet. Find a place to stay, a ride or a table.</p>
               <div className="acts"><button onClick={onBrowse}>Browse services</button></div>
@@ -264,10 +272,13 @@ export default function ItineraryPage({ user, bookings, onCancel, onBack, onBrow
                   <div className="main">
                     <h3>{b.itemName}</h3>
                     <p>{b.place}</p>
-                    <p>{when(b)} · {b.people} {b.kind === "accommodation" ? "guest(s)" : b.kind === "transport" ? "passenger(s)" : "people"}</p>
+                    <p>{when(b)} · {b.people} {b.kind === "accommodation" ? "guest(s)" : b.kind === "transport" ? "passenger(s)" : b.kind === "event" ? "ticket(s)" : "people"}</p>
+                    {b.kind !== "event" && b.tickets?.length > 0 && <p className="ref">🎶 Includes tickets: {b.tickets.map((t) => `${t.title} × ${t.quantity}`).join(", ")}</p>}
+                    {b.reference && <p className="ref">{b.reference}{b.payment?.isPaid && ` · ${b.payment.summary}`}</p>}
                   </div>
                   <div className="right">
                     <div className="amt">{b.kind === "restaurant" ? "Reservation" : `RM${b.total}`}</div>
+                    {b.payment && <small className="paid">{b.payment.statusLabel}</small>}
                     <span className={`pill p-${state}`}>{state === "past" ? "Completed" : state === "cancelled" ? "Cancelled" : "Confirmed"}</span>
                     {state === "confirmed" && <div><button className="cancel" onClick={() => cancel(b)}>Cancel</button></div>}
                   </div>
@@ -282,7 +293,7 @@ export default function ItineraryPage({ user, bookings, onCancel, onBack, onBrow
             <h3>🎶 Events near your stay</h3>
             <p className="sugg-sub">Concerts and festivals around your accommodation. Add them to your itinerary.</p>
             {suggestions.map((e, i) => (
-              <EventRow key={e.id} event={e} note={e.when} saved={false} onToggle={onToggleEvent} delay={i * 60} />
+              <EventRow key={e.id} event={e} note={e.when} saved={false} sellTickets onToggle={onToggleEvent} onBuy={onBuyEvent} delay={i * 60} />
             ))}
           </section>
         )}
