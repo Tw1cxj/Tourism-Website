@@ -77,6 +77,8 @@ body{margin:0;font-family:"Segoe UI",system-ui,sans-serif;color:#14213d;backgrou
 .book:hover{transform:translateY(-2px);box-shadow:0 8px 18px rgba(20,33,61,.25);filter:brightness(1.08)}
 .book:active{transform:translateY(0)}
 .book:focus-visible{outline:3px solid var(--accent,#2a6df4);outline-offset:2px}
+.actions{display:flex;gap:10px;margin-top:14px}
+.actions .book{margin-top:0;flex:1}
 @media(max-width:760px){.filters{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 `;
@@ -156,12 +158,12 @@ const SCENES = {
   ),
 };
 
-function Illustration({ type }) {
+export function Illustration({ type }) {
   return SCENES[type] ?? SCENES.Hotel;
 }
 const DEFAULTS = { query: "", type: "", maxPrice: 600, guests: 1, sort: "recommended" };
 
-export default function SearchPage({ accommodations = sampleAccommodations, user, onLogout, onBack, onBook }) {
+export default function SearchPage({ accommodations = sampleAccommodations, user, onLogout, onBack, onBook, onReview }) {
   const [filters, setFilters] = useState(DEFAULTS);
   useSearchTelemetry(user, "accommodation", filters);
   const [loading, setLoading] = useState(true);
@@ -272,7 +274,11 @@ export default function SearchPage({ accommodations = sampleAccommodations, user
                     <span className="price"><strong>RM{a.pricePerNight}</strong> <span>/ night</span></span>
                     <span className="meta"><b>★ {a.rating}</b>up to {a.maxGuests}</span>
                   </div>
-                  <button className="book" onClick={() => onBook?.(a)}>Book now</button>
+                  <div className="actions">
+                    <button className="book" onClick={() => onBook?.(a)}>Book now</button>
+                    <button className="book review" onClick={() => onReview?.(a)}>Review</button>
+                  </div>
+                  
                 </div>
               </article>
             ))}
