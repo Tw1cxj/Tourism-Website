@@ -80,6 +80,8 @@ const SERVICES = [
     icon: <svg viewBox="0 0 24 24"><path d="M5 16l1.6-5.2A2 2 0 018.5 9.4h7a2 2 0 011.9 1.4L19 16M4 16h16v3H4zM7 19v1.5M17 19v1.5" /><circle cx="8" cy="13" r=".6" /><circle cx="16" cy="13" r=".6" /></svg> },
   { to: "/restaurant", title: "Restaurant", text: "Sarawak laksa, kolo mee, seafood and more.", cta: "Find food", color: "#ea580c",
     icon: <svg viewBox="0 0 24 24"><path d="M6 3v7a2 2 0 004 0V3M8 12v9M17 3c-2.2 1.8-3 4.2-3 8h3v10" /></svg> },
+  { to: "/enquiry", title: "Enquiry", text: "Questions about your trip? Send us a message and we'll get back to you.", cta: "Make an enquiry", color: "#64748b",
+    icon: <svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4zM8 9h8M8 12.5h5" /></svg> },
 ];
 
 export default function LandingPage({ user, onLogout, bookings = [], onItinerary, savedEvents = [], onToggleEvent }) {

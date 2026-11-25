@@ -13,7 +13,7 @@ const LOOK = {
 };
 const DEFAULTS = { query: "", cuisine: "", maxLevel: 3, dietary: "", sort: "recommended" };
 
-export default function RestaurantPage({ items = sampleRestaurants, user, onLogout, onBack, onBook }) {
+export default function RestaurantPage({ items = sampleRestaurants, user, onLogout, onBack, onBook, onReview }) {
   const [filters, setFilters] = useState(DEFAULTS);
   useSearchTelemetry(user, "restaurant", filters);
   const [loading, setLoading] = useState(true);
@@ -92,14 +92,17 @@ export default function RestaurantPage({ items = sampleRestaurants, user, onLogo
                   </Thumb>
                   <div className="body">
                     <h3>{r.name}</h3>
-                  <p style={{ color: r.verificationStatus === "Verified" ? "#17633c" : "#8a5600", fontSize: 14 }}>{r.verificationStatus ?? "Verification overdue"}</p>
+                    <p style={{ color: r.verificationStatus === "Verified" ? "#17633c" : "#8a5600", fontSize: 14 }}>{r.verificationStatus ?? "Verification overdue"}</p>
                     <p className="loc">{r.location.toString()} · {r.hours}</p>
                     <div className="tags">{[...r.dietary, ...r.features].map((f) => <span key={f}>{f}</span>)}</div>
                     <div className="row">
                       <span className="price"><strong>{r.priceLabel}</strong></span>
                       <span className="meta"><b>★ {r.rating}</b>rated</span>
                     </div>
-                  <button className="book" onClick={() => onBook?.(r)}>Reserve a table</button>
+                  <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+                    <button className="book" style={{ marginTop: 0, flex: 1 }} onClick={() => onBook?.(r)}>Reserve a table</button>
+                    <button className="book" style={{ marginTop: 0, flex: 1 }} onClick={() => onReview?.(r)}>Review</button>
+                  </div>
                   </div>
                 </article>
               );

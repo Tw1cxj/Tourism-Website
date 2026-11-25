@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import AuthPages from "./AuthPages";
 import LandingPage from "./LandingPage";
 import SearchPage from "./SearchPage";
+import ReviewPage from "./ReviewPage";
+import EnquiryPage from "./EnquiryPage"; 
 import TransportPage from "./TransportPage";
 import RestaurantPage from "./RestaurantPage";
 import BookingPage from "./BookingPage";
@@ -28,6 +30,30 @@ function toDraft(kind, item) {
   if (kind === "accommodation") return { itemId: item.id, name: item.name, place, unitPrice: item.pricePerNight, unit: "night", max: item.maxGuests };
   if (kind === "transport") return { itemId: item.id, name: item.name, place, unitPrice: item.price, unit: item.priceUnit, max: item.capacity };
   return { itemId: item.id, name: item.name, place, priceLabel: item.priceLabel, max: 12 };
+}
+
+const REVIEW_BACK = { accommodation: "/accommodation", transport: "/transportation", restaurant: "/restaurant" };
+
+function ReviewRoute({ tourism, repository, user, onBack, onLogout }) {
+  const { state } = useLocation();
+  const kind = state?.kind;
+  if (!REVIEW_BACK[kind]) return <Navigate to="/home" replace />;
+  const item = publishedCatalog(tourism, kind).find((x) => x.id === state.id);
+  if (!item) return <Navigate to={REVIEW_BACK[kind]} replace />;
+  // Only reviews an admin has published are shown to visitors
+  const published = (tourism.reviews ?? []).filter((r) => r.category === kind && r.listingId === item.id && r.status === "published");
+  // A new review is saved as "pending" so it appears in the admin Reviews tab for moderation
+  const submitReview = ({ rating, comment }) =>
+    repository.update(user, `Submitted ${kind} review for listing ${item.id}`, (next) => {
+      next.reviews = next.reviews ?? [];
+      next.reviews.push({
+        id: Math.max(0, ...next.reviews.map((r) => Number(r.id) || 0)) + 1,
+        category: kind, listingId: item.id,
+        authorId: user.id, authorName: user.name,
+        rating, comment, status: "pending", createdAt: new Date().toISOString(),
+      });
+    });
+  return <ReviewPage kind={kind} item={item} reviews={published} onSubmit={submitReview} user={user} onBack={() => onBack(REVIEW_BACK[kind])} onLogout={onLogout} />;
 }
 
 export default function App() {
@@ -63,6 +89,8 @@ export default function App() {
   const people = [ROLES.USER, ROLES.VENDOR]; // roles that use the normal site
   const home = () => navigate("/home");
   // Book button -> opens the booking page for that item
+  // Review button -> opens the review page for that item
+  const review = (kind) => (item) => navigate("/review", { state: { kind, id: item.id } });
   const book = (kind) => (item) => { repository.recordActivity(user, "listing_view", { category: kind, listingId: item.id }); navigate("/booking", { state: { kind, draft: toDraft(kind, item) } }); };
 
   return (
@@ -95,6 +123,7 @@ export default function App() {
         onLogout={handleLogout}
         onBack={home}
         onBook={book("accommodation")}
+        onReview={review("accommodation")}
       />
     </Guard>
   }
@@ -110,6 +139,7 @@ export default function App() {
         onLogout={handleLogout}
         onBack={home}
         onBook={book("transport")}
+        onReview={review("transport")}
       />
     </Guard>
   }
@@ -125,6 +155,7 @@ export default function App() {
         onLogout={handleLogout}
         onBack={home}
         onBook={book("restaurant")}
+        onReview={review("restaurant")}
       />
     </Guard>
   }
@@ -141,6 +172,24 @@ export default function App() {
       />
     </Guard>
   }
+/>
+
+<Route
+  path="/review"
+  element={
+    <Guard user={user} allow={people}>
+      <ReviewRoute tourism={tourism} repository={repository} user={user} onBack={(path) => navigate(path)} onLogout={handleLogout} />
+    </Guard>
+  }
+/>
+
+<Route 
+  path="/enquiry" 
+  element={
+    <Guard user={user} allow={people}>
+      <EnquiryPage user={user} onLogout={handleLogout} onBack={home} />
+    </Guard>
+  } 
 />
 
       <Route path="/booking" element={<Guard user={user} allow={people}><BookingPage user={user} onLogout={handleLogout} onConfirm={addBooking} savedEvents={savedEvents} onToggleEvent={toggleEvent} /></Guard>} />

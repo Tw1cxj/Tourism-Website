@@ -9,7 +9,7 @@ const LOOK = {
 };
 const DEFAULTS = { query: "", type: "", maxPrice: 100, seats: 1, sort: "recommended" };
 
-export default function TransportPage({ items = sampleTransport, user, onLogout, onBack, onBook }) {
+export default function TransportPage({ items = sampleTransport, user, onLogout, onBack, onBook, onReview }) {
   const [filters, setFilters] = useState(DEFAULTS);
   useSearchTelemetry(user, "transport", filters);
   const [loading, setLoading] = useState(true);
@@ -81,14 +81,17 @@ export default function TransportPage({ items = sampleTransport, user, onLogout,
                   </Thumb>
                   <div className="body">
                     <h3>{t.name}</h3>
-                  <p style={{ color: t.verificationStatus === "Verified" ? "#17633c" : "#8a5600", fontSize: 14 }}>{t.verificationStatus ?? "Verification overdue"}</p>
+                    <p style={{ color: t.verificationStatus === "Verified" ? "#17633c" : "#8a5600", fontSize: 14 }}>{t.verificationStatus ?? "Verification overdue"}</p>
                     <p className="loc">{t.location.toString()}</p>
                     <div className="tags">{t.features.map((f) => <span key={f}>{f}</span>)}</div>
                     <div className="row">
                       <span className="price"><strong>RM{t.price}</strong> <span>/ {t.priceUnit}</span></span>
                       <span className="meta"><b>★ {t.rating}</b>up to {t.capacity}</span>
                     </div>
-                  <button className="book" onClick={() => onBook?.(t)}>Book now</button>
+                    <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+                      <button className="book" style={{ marginTop: 0, flex: 1 }} onClick={() => onBook?.(t)}>Book now</button>
+                      <button className="book" style={{ marginTop: 0, flex: 1 }} onClick={() => onReview?.(t)}>Review</button>
+                    </div>
                   </div>
                 </article>
               );
