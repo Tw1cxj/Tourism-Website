@@ -42,7 +42,7 @@ function toEventDraft(event) {
 
 const REVIEW_BACK = { accommodation: "/accommodation", transport: "/transportation", restaurant: "/restaurant" };
 
-function ReviewRoute({ tourism, repository, user, onBack, onLogout }) {
+function ReviewRoute({ tourism, repository, user, onBook, onBack, onLogout }) {
   const { state } = useLocation();
   const kind = state?.kind;
   if (!REVIEW_BACK[kind]) return <Navigate to="/home" replace />;
@@ -61,7 +61,7 @@ function ReviewRoute({ tourism, repository, user, onBack, onLogout }) {
         rating, comment, status: "pending", createdAt: new Date().toISOString(),
       });
     });
-  return <ReviewPage kind={kind} item={item} reviews={published} onSubmit={submitReview} user={user} onBack={() => onBack(REVIEW_BACK[kind])} onLogout={onLogout} />;
+    return <ReviewPage kind={kind} item={item} reviews={published} onSubmit={submitReview} onBook={onBook(kind)} user={user} onBack={() => onBack(REVIEW_BACK[kind])} onLogout={onLogout} />;
 }
 
 export default function App() {
@@ -218,7 +218,7 @@ export default function App() {
   path="/review"
   element={
     <Guard user={user} allow={people}>
-      <ReviewRoute tourism={tourism} repository={repository} user={user} onBack={(path) => navigate(path)} onLogout={handleLogout} />
+            <ReviewRoute tourism={tourism} repository={repository} user={user} onBack={(path) => navigate(path)} onBook={book} onLogout={handleLogout} />
     </Guard>
   }
 />

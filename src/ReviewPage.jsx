@@ -80,6 +80,9 @@ body{margin:0;font-family:"Segoe UI",system-ui,sans-serif;color:#14213d;backgrou
 .rv .side .star{font-size:1.4rem;color:#c3cce0}
 .rv .side .star.on{color:#f59e0b}
 .rv .cnt{display:block;text-align:center;margin-top:4px;color:#5b6784;font-size:.85rem}
+.rv .book{display:block;width:100%;margin-top:20px;border:0;background:#2a6df4;color:#fff;padding:13px;border-radius:12px;font:inherit;font-weight:600;cursor:pointer;transition:transform .2s,box-shadow .2s,filter .2s}
+.rv .book:hover{transform:translateY(-2px);box-shadow:0 8px 18px rgba(42,109,244,.3);filter:brightness(1.06)}
+.rv .book:focus-visible{outline:3px solid #14307a;outline-offset:2px}
 
 /* ---------- half screen / phone ---------- */
 @media(max-width:860px){.rv-grid{grid-template-columns:1fr}.rv .side{order:-1}.rv-main{min-height:0}.rv-inner{position:static;display:block}.rv-inner .box{margin-bottom:20px}.rv-inner .box:last-child{margin-bottom:0}.rv .rv-reviews{display:block}.rv .rlist{max-height:420px}}
@@ -116,7 +119,7 @@ const LOOK = {
 
 // reviews  = the PUBLISHED reviews for this listing (from the shared store, approved by an admin)
 // onSubmit = sends a new review to the store as "pending" so it shows up in the admin Reviews tab
-export default function ReviewPage({ kind = "accommodation", item, accommodation, reviews = [], onSubmit, user, onBack, onLogout }) {
+export default function ReviewPage({ kind = "accommodation", item, accommodation, reviews = [], onSubmit, onBook, user, onBack, onLogout }) {
   const a = item ?? accommodation;
   const look = LOOK[a.cuisine ?? a.type] ?? { emoji: kind === "transport" ? "🚌" : "🍽️", from: "#1d4ed8", to: "#38bdf8" };
   const [rating, setRating] = useState(0);
@@ -206,6 +209,9 @@ export default function ReviewPage({ kind = "accommodation", item, accommodation
               <div className="srow" key={label}><span>{label}</span><span>{value}</span></div>
             ))}
             <div className="tot"><span>Rating</span>{reviews.length > 0 && <strong>{avg.toFixed(1)} / 5</strong>}<div className="tot-r"><Stars value={Math.round(avg)} /><span className="cnt">{reviews.length ? `${reviews.length} review${reviews.length > 1 ? "s" : ""}` : "No reviews yet"}</span></div></div>
+            <button type="button" className="book" onClick={() => onBook?.(a)}>
+              Book now
+            </button>
           </aside>
         </div>
       </div>
